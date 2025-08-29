@@ -1,20 +1,26 @@
-import { useRouter } from "next/router";
+// pages/logout.js
 import { useEffect } from "react";
-import TopButton from "@/components/TopButton";
+import { useRouter } from "next/router";
 
 export default function Logout() {
   const router = useRouter();
 
   useEffect(() => {
-    setTimeout(() => {
-      router.push("/");
+    // ローカル状態などがあればここでリセット
+    // 例: window.localStorage.removeItem("nip07_account");
+    
+    // 0.5秒後にトップに戻す
+    const timer = setTimeout(() => {
+      router.push("/"); // トップページに戻る
     }, 500);
+
+    return () => clearTimeout(timer);
   }, [router]);
 
   return (
-    <div className="p-6">
-      <TopButton />
-      <h1 className="text-xl font-bold mt-12">ログアウト中...</h1>
+    <div style={{ textAlign: "center", marginTop: "50px" }}>
+      <h1>ログアウトしました</h1>
+      <p>トップページに戻ります…</p>
     </div>
   );
 }
