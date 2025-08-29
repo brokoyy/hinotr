@@ -1,73 +1,104 @@
-// pages/timeline.js
-import { useEffect, useState } from 'react';
-import { defaultRelays, fetchProfile, postEvent } from '../lib/nostr';
+import React, { useContext, useEffect, useRef, useState } from 'react'
+import { NostrContext, identiconSvg } from '../lib/nostr'
+import { useRouter } from 'next/router'
 
-export default function Timeline() {
-  const [events, setEvents] = useState([]);
-  const [message, setMessage] = useState('');
-  const [profiles, setProfiles] = useState({});
+export default function Timeline(){
+  const { pubkey, relays, subscribeTimeline, getProfile, publishNote } = useContext(NostrContext)
+  const router = useRouter()
+  const [events, setEvents] = useState([])
+  const [profiles, setProfiles] = useState({}) // pubkey -> {name, picture}
+  const [text, setText] = useState('')
+  const seen = useRef(new Set())
 
   useEffect(() => {
-    const relays = defaultRelays.map(url => {
-      const r = window.nostrTools.relayInit(url);
-      r.connect();
-      r.on('event', async (event) => {
-        if (event.kind === 1) {
-          setEvents(prev => [event, ...prev]);
-          if (!profiles[event.pubkey]) {
-            const p = await fetchProfile(event.pubkey);
-            setProfiles(prev => ({ ...prev, [event.pubkey]: p }));
+    if (typeof window === 'undefined') return
+    if (!pubkey) { router.replace('/'); return }
+    if (!relays || relays.length === 0) return
+
+    // 最新50件 + リアルタイム
+    const sub = subscribeTimeline(
+      [{ kinds:[1], limit: 50 }],
+      {
+        onEvent: async (evt) => {
+          if (seen.current.has(evt.id)) return
+          seen.current.add(evt.id)
+          setEvents(prev => {
+            const next = [evt, ...prev]
+            return next.slice(0, 100)
+          })
+          // プロフィール解決
+          if (!profiles[evt.pubkey]) {
+            const p = await getProfile(evt.pubkey)
+            setProfiles(prev => ({...prev, [evt.pubkey]: p}))
           }
         }
-      });
-      r.on('connect', () => {
-        r.subscribe({ kinds: [1] });
-      });
-      return r;
-    });
+      }
+    )
+    return () => sub && sub.close()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pubkey, relays])
 
-    return () => relays.forEach(r => r.close());
-  }, []);
+  if (!pubkey) return null
 
-  async function sendMessage() {
-    if (!message) return;
-    const pubkey = await window.nostr.getPublicKey();
-    const event = {
-      kind: 1,
-      content: message,
-      pubkey,
-      created_at: Math.floor(Date.now() / 1000)
-    };
-    event.id = window.nostrTools.getEventHash(event);
-    event.sig = await window.nostr.signEvent(event);
-    postEvent(event);
-    setMessage('');
+  const onSend = async () => {
+    try{
+      await publishNote(text)
+      setText('')
+    }catch(e){
+      alert('送信失敗: ' + (e && e.message ? e.message : e))
+    }
   }
 
   return (
-    <div>
-      <button onClick={() => window.location.href = '/'}>トップに戻る</button>
-      <h2>タイムライン</h2>
-      <div>
-        <input 
-          type="text" 
-          value={message} 
-          onChange={e => setMessage(e.target.value)} 
-          placeholder="投稿内容" 
+    <div className="page">
+      <h1>タイムライン</h1>
+
+      {/* 投稿フォーム */}
+      <div className="composer">
+        <textarea
+          value={text}
+          onChange={e=>setText(e.target.value)}
+          placeholder="いまどうしてる？"
+          rows={3}
         />
-        <button onClick={sendMessage}>送信</button>
+        <button onClick={onSend} disabled={!text.trim()}>送信</button>
       </div>
-      <ul>
-        {events.map((e, idx) => {
-          const p = profiles[e.pubkey] || {};
+
+      {/* TL */}
+      <div className="list">
+        {events.map(evt => {
+          const p = profiles[evt.pubkey]
+          const name = p?.name || `${evt.pubkey.slice(0,8)}…${evt.pubkey.slice(-4)}`
+          const avatar = p?.picture || identiconSvg(evt.pubkey, 36)
           return (
-            <li key={idx}>
-              <img src={p.picture || '/default_icon.png'} width={40} height={40} alt="icon"/>
-              <strong>{p.name || 'No Name'}</strong>: {e.content}
-            </li>
-          );
+            <div key={evt.id} className="item">
+              <img className="avatar" src={avatar} alt="" />
+              <div className="body">
+                <div className="head">
+                  <span className="name">{name}</span>
+                  <span className="time">{new Date((evt.created_at||0)*1000).toLocaleString()}</span>
+                </div>
+                <div className="content">{evt.content}</div>
+              </div>
+            </div>
+          )
         })}
-      </ul>
+      </div>
+
+      <style jsx>{`
+        .page{ padding:16px 16px 40px }
+        .composer{ display:flex; gap:8px; align-items:flex-end; margin-bottom:12px }
+        .composer textarea{ flex:1; border:1px solid #ddd; border-radius:8px; padding:8px; resize:vertical }
+        .composer button{ padding:8px 12px }
+        .list{ display:flex; flex-direction:column; gap:10px }
+        .item{ display:flex; gap:10px; border-bottom:1px solid #f0f0f0; padding-bottom:10px }
+        .avatar{ width:36px; height:36px; border-radius:9999px; object-fit:cover; flex:0 0 auto }
+        .body{ flex:1; min-width:0 }
+        .head{ display:flex; gap:8px; align-items:baseline; font-size:14px }
+        .name{ font-weight:600 }
+        .time{ color:#777; font-size:12px }
+        .content{ white-space:pre-wrap; word-break:break-word; margin-top:4px }
+      `}</style>
     </div>
-  );
+  )
 }
