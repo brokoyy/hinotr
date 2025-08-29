@@ -1,57 +1,41 @@
-import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
-import { SimplePool } from "nostr-tools";
-
-const relays = [
-  "wss://relay.nostr.band",
-  "wss://relay-jp.nostr.wirednet.jp",
-  "wss://yabu.me",
-  "wss://r.kojira.io"
-];
+import { useEffect, useState } from 'react';
+import useNostr from '../utils/useNostr';
 
 export default function Profile() {
+  const { pubkey, relays } = useNostr();
   const [profile, setProfile] = useState(null);
-  const router = useRouter();
 
   useEffect(() => {
-    const pubkey = localStorage.getItem("pubkey");
-    if (!pubkey) {
-      router.push("/");
-      return;
-    }
+    if (!pubkey || relays.length === 0) return;
 
-    const pool = new SimplePool();
-    const sub = pool.sub(relays, [{ kinds: [0], authors: [pubkey] }]);
-
-    sub.on("event", (event) => {
-      try {
-        const content = JSON.parse(event.content);
-        setProfile(content);
-      } catch (e) {
-        console.error("Invalid profile event:", e);
-      }
+    relays.forEach((relay) => {
+      const sub = relay.sub([{ kinds: [0], authors: [pubkey] }]);
+      sub.on('event', (event) => {
+        try {
+          const content = JSON.parse(event.content);
+          setProfile({
+            name: content.display_name || content.name || "No Name",
+            picture: content.picture || null,
+          });
+        } catch (e) {
+          console.error("Failed to parse profile", e);
+        }
+      });
     });
-
-    return () => {
-      sub.unsub();
-      pool.close(relays);
-    };
-  }, [router]);
-
-  if (!profile) return <div className="p-4">Loading...</div>;
+  }, [pubkey, relays]);
 
   return (
-    <div className="p-4 flex flex-col items-center">
-      {profile.picture && (
-        <img
-          src={profile.picture}
-          alt="icon"
-          className="w-24 h-24 rounded-full mb-2"
-        />
+    <div className="p-6">
+      {profile ? (
+        <div className="flex items-center space-x-4">
+          {profile.picture && (
+            <img src={profile.picture} alt="icon" className="w-16 h-16 rounded-full" />
+          )}
+          <h2 className="text-xl font-bold">{profile.name}</h2>
+        </div>
+      ) : (
+        <p>Loading profile...</p>
       )}
-      <h2 className="text-lg font-bold">
-        {profile.display_name || profile.name || "No Name"}
-      </h2>
     </div>
   );
 }
