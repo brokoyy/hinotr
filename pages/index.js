@@ -43,7 +43,7 @@ return (
 <style jsx>{`
 .page { padding:24px }
 .center{ display:flex; flex-direction:column; align-items:center }
-.title{ font-size:20px; margin-bottom:12px }
+.title{ font-size:40px; margin-bottom:12px }
 .grid{ width:100%; max-width:420px; display:grid; grid-template-columns:1fr 1fr; gap:12px }
 `}</style>
 </div>
