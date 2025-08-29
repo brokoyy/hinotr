@@ -1,0 +1,16 @@
+{
+"name": "hinotr",
+"version": "0.3.0",
+"private": true,
+"scripts": {
+"dev": "next dev",
+"build": "next build",
+"start": "next start"
+},
+"dependencies": {
+"next": "13.5.4",
+"react": "18.2.0",
+"react-dom": "18.2.0",
+"nostr-tools": "^2.7.2"
+}
+}
