@@ -1,79 +1,85 @@
-import { useEffect, useState } from "react";
-import { useRouter } from "next/router";
-import { SimplePool } from "nostr-tools";
-
-const relays = [
-  "wss://relay.nostr.band",
-  "wss://relay-jp.nostr.wirednet.jp",
-  "wss://yabu.me",
-  "wss://r.kojira.io"
-];
+import { useEffect, useState } from 'react';
+import useNostr from '../utils/useNostr';
+import { generatePrivateKey, getEventHash, getSignature } from 'nostr-tools';
 
 export default function Timeline() {
+  const { pubkey, relays } = useNostr();
   const [events, setEvents] = useState([]);
-  const [profiles, setProfiles] = useState({});
-  const router = useRouter();
+  const [newPost, setNewPost] = useState("");
 
   useEffect(() => {
-    const pubkey = localStorage.getItem("pubkey");
-    if (!pubkey) {
-      router.push("/");
-      return;
-    }
+    if (!pubkey || relays.length === 0) return;
 
-    const pool = new SimplePool();
-    const sub = pool.sub(relays, [{ kinds: [1], limit: 20 }]);
-
-    sub.on("event", (event) => {
-      setEvents((prev) => {
-        if (prev.find((e) => e.id === event.id)) return prev;
-        return [event, ...prev].slice(0, 50);
-      });
-
-      // fetch profile if not cached
-      if (!profiles[event.pubkey]) {
-        const ps = pool.sub(relays, [{ kinds: [0], authors: [event.pubkey] }]);
-        ps.on("event", (pe) => {
-          try {
-            setProfiles((prev) => ({
-              ...prev,
-              [event.pubkey]: JSON.parse(pe.content),
-            }));
-          } catch (e) {}
+    const subs = relays.map((relay) => {
+      const sub = relay.sub([{ kinds: [1], limit: 20 }]);
+      sub.on('event', (event) => {
+        setEvents((prev) => {
+          if (prev.find((e) => e.id === event.id)) return prev;
+          return [event, ...prev].slice(0, 50);
         });
-      }
+      });
+      return sub;
     });
 
     return () => {
-      sub.unsub();
-      pool.close(relays);
+      subs.forEach((sub) => sub.unsub());
     };
-  }, [router]);
+  }, [pubkey, relays]);
+
+  const handleSend = async () => {
+    if (!newPost.trim() || relays.length === 0) return;
+
+    const event = {
+      kind: 1,
+      pubkey,
+      created_at: Math.floor(Date.now() / 1000),
+      tags: [],
+      content: newPost,
+    };
+
+    event.id = getEventHash(event);
+    event.sig = await window.nostr.signEvent(event);
+
+    relays.forEach((relay) => relay.publish(event));
+
+    setNewPost("");
+  };
 
   return (
-    <div className="p-4 space-y-4">
-      {events.map((ev) => {
-        const profile = profiles[ev.pubkey] || {};
-        return (
-          <div key={ev.id} className="flex items-start space-x-2 border-b pb-2">
-            {profile.picture ? (
-              <img
-                src={profile.picture}
-                alt="icon"
-                className="w-10 h-10 rounded-full"
-              />
-            ) : (
-              <div className="w-10 h-10 bg-gray-300 rounded-full" />
-            )}
+    <div className="p-6 space-y-6">
+      {/* 投稿フォーム */}
+      <div className="flex space-x-2">
+        <input
+          type="text"
+          className="flex-1 border p-2 rounded"
+          value={newPost}
+          onChange={(e) => setNewPost(e.target.value)}
+          placeholder="What's happening?"
+        />
+        <button
+          onClick={handleSend}
+          className="px-4 py-2 bg-blue-500 text-white rounded"
+        >
+          Post
+        </button>
+      </div>
+
+      {/* タイムライン */}
+      <div className="space-y-4">
+        {events.map((event) => (
+          <div key={event.id} className="flex items-start space-x-3 border-b pb-2">
+            <img
+              src="/icon.png"
+              alt="icon"
+              className="w-10 h-10 rounded-full"
+            />
             <div>
-              <p className="font-bold text-sm">
-                {profile.display_name || profile.name || ev.pubkey.slice(0, 8)}
-              </p>
-              <p className="text-sm whitespace-pre-wrap">{ev.content}</p>
+              <p className="font-semibold">{event.pubkey.slice(0, 10)}...</p>
+              <p>{event.content}</p>
             </div>
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }
