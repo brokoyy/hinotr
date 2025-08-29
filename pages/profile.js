@@ -1,38 +1,57 @@
-import { useEffect, useState } from 'react';
-import { getPublicKey } from 'nostr-tools';
+import { useEffect, useState } from "react";
+import { relayInit } from "nostr-tools";
 
-export default function Profile() {
+export default function Profile({ pubkey, relays }) {
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    const pubkey = localStorage.getItem('pubkey');
     if (!pubkey) return;
-
     async function fetchProfile() {
-      try {
-        const metadata = JSON.parse(localStorage.getItem('profile') || '{}');
-        setProfile(metadata);
-      } catch (err) {
-        console.error("プロフィール取得エラー:", err);
-      }
+      const relay = relayInit(relays[0]);
+      await relay.connect();
+
+      relay.on("connect", () => {
+        console.log(`connected to ${relay.url}`);
+      });
+
+      relay.on("error", () => {
+        console.log(`failed to connect to ${relay.url}`);
+      });
+
+      let sub = relay.sub([
+        {
+          kinds: [0],
+          authors: [pubkey],
+          limit: 1,
+        },
+      ]);
+
+      sub.on("event", (event) => {
+        try {
+          const metadata = JSON.parse(event.content);
+          setProfile(metadata);
+        } catch (e) {
+          console.error("Failed to parse metadata", e);
+        }
+      });
+
+      sub.on("eose", () => {
+        sub.unsub();
+      });
     }
     fetchProfile();
-  }, []);
+  }, [pubkey, relays]);
 
-  if (!profile) {
-    return <div className="p-4">プロフィール情報がありません</div>;
-  }
+  if (!profile) return <p>Loading profile...</p>;
 
   return (
-    <div className="flex flex-col items-center p-6">
-      {profile.picture && (
-        <img
-          src={profile.picture}
-          alt="avatar"
-          className="w-24 h-24 rounded-full mb-4"
-        />
-      )}
-      <h2 className="text-xl font-bold">{profile.name || 'No Name'}</h2>
+    <div className="p-4">
+      <img
+        src={profile.picture}
+        alt="icon"
+        className="w-16 h-16 rounded-full mb-2"
+      />
+      <h2 className="text-xl font-bold">{profile.name || "No Name"}</h2>
     </div>
   );
 }
