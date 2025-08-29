@@ -1,0 +1,12 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* アプリ全体の背景やフォント設定などを追加する場合はここに書く */
+body {
+  @apply bg-gray-100 text-gray-900 font-sans;
+}
+
+button {
+  @apply px-4 py-2 rounded-lg shadow bg-blue-500 text-white font-medium hover:bg-blue-600 transition;
+}
