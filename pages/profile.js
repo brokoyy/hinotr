@@ -1,46 +1,50 @@
-import React, { useContext, useEffect, useState } from 'react'
-import { NostrContext, identiconSvg } from '../lib/nostr'
-import { useRouter } from 'next/router'
+import { useEffect, useState } from "react";
+import { relayInit } from "nostr-tools";
+import TopButton from "@/components/TopButton";
 
-export default function Profile(){
-  const { pubkey, getProfile } = useContext(NostrContext)
-  const router = useRouter()
-  const [meta, setMeta] = useState(null)
+export default function Profile() {
+  const [profile, setProfile] = useState(null);
+  const relays = [
+    "wss://relay.nostr.band/",
+    "wss://relay-jp.nostr.wirednet.jp/",
+    "wss://yabu.me/",
+    "wss://r.kojira.io/",
+  ];
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!pubkey) { router.replace('/'); return }
-    let live = true
-    ;(async () => {
-      const p = await getProfile(pubkey)
-      if (!live) return
-      setMeta(p)
-    })()
-    return () => { live = false }
-  }, [pubkey])
+    async function fetchProfile() {
+      const relay = relayInit(relays[0]);
+      await relay.connect();
 
-  if (!pubkey) return null
+      const sub = relay.sub([
+        { kinds: [0], authors: ["あなたの公開鍵をここに"] }
+      ]);
 
-  const displayName = meta?.name || `${pubkey.slice(0,8)}…${pubkey.slice(-4)}`
+      sub.on("event", (event) => {
+        try {
+          const metadata = JSON.parse(event.content);
+          setProfile(metadata);
+        } catch {
+          setProfile({});
+        }
+        sub.unsub();
+      });
+    }
+    fetchProfile();
+  }, []);
 
   return (
-    <div className="page center">
-      <h1>プロフィール</h1>
-      <img
-        src={meta?.picture || identiconSvg(pubkey, 80)}
-        alt="avatar"
-        className="avatar"
-      />
-      <div className="name">{displayName}</div>
-      {meta?.about && <div className="about">{meta.about}</div>}
-
-      <style jsx>{`
-        .page{ padding:24px }
-        .center{ display:flex; flex-direction:column; align-items:center }
-        .avatar{ width:80px; height:80px; border-radius:9999px; object-fit:cover }
-        .name{ margin-top:12px; font-weight:600; word-break:break-all }
-        .about{ margin-top:8px; color:#444; text-align:center; max-width:320px; white-space:pre-wrap }
-      `}</style>
+    <div className="p-6">
+      <TopButton />
+      <h1 className="text-xl font-bold mt-12">プロフィール</h1>
+      {profile ? (
+        <div className="mt-4">
+          <p>名前: {profile.name || "No Name"}</p>
+          <p>自己紹介: {profile.about || "なし"}</p>
+        </div>
+      ) : (
+        <p>読み込み中...</p>
+      )}
     </div>
-  )
+  );
 }
