@@ -1,45 +1,38 @@
-// pages/relays.js
-import React, { useState } from "react";
-import { DEFAULT_RELAYS, setRelays, getRelays } from "../lib/nostr";
+import React, { useContext, useEffect, useState } from 'react'
+import { NostrContext, DEFAULT_RELAYS } from '../lib/nostr'
+import { useRouter } from 'next/router'
 
-export default function Relays() {
-  const [relays, updateRelays] = useState(getRelays());
+export default function Relays(){
+  const { pubkey, relays, setRelays } = useContext(NostrContext)
+  const [local, setLocal] = useState(DEFAULT_RELAYS.join('\n'))
+  const router = useRouter()
 
-  const handleChange = (index, value) => {
-    const newRelays = [...relays];
-    newRelays[index] = value;
-    updateRelays(newRelays);
-  };
+  useEffect(() => {
+    if (!pubkey) { router.replace('/'); return }
+    setLocal((relays && relays.length ? relays : DEFAULT_RELAYS).join('\n'))
+  }, [pubkey]) // eslint-disable-line
 
-  const handleSave = () => {
-    setRelays(relays);
-    alert("リレー設定を保存しました");
-  };
+  function save(){
+    const arr = local.split('\n').map(s=>s.trim()).filter(Boolean)
+    setRelays(arr)
+    alert('保存しました')
+  }
+
+  function addRelay(){ setLocal(prev => (prev ? prev + '\n' : '') + 'wss://') }
+
+  if (!pubkey) return null
 
   return (
-    <div className="p-4">
-      <button
-        className="mb-4 bg-gray-200 p-2 rounded"
-        onClick={() => (window.location.href = "/")}
-      >
-        トップに戻る
-      </button>
-      {relays.map((r, i) => (
-        <div key={i} className="mb-2">
-          <input
-            type="text"
-            value={r}
-            onChange={e => handleChange(i, e.target.value)}
-            className="border p-1 w-full"
-          />
-        </div>
-      ))}
-      <button
-        onClick={handleSave}
-        className="mt-2 bg-blue-500 text-white p-2 rounded"
-      >
-        保存
-      </button>
+    <div className="page">
+      <h1>リレー設定</h1>
+      <p>各行に 1 つの WebSocket リレー URL を記述してください。</p>
+      <textarea value={local} onChange={e=>setLocal(e.target.value)} rows={8} style={{width:'100%'}} />
+      <div style={{marginTop:12}}>
+        <button onClick={save}>保存</button>
+        <button onClick={addRelay} style={{marginLeft:8}}>追加テンプレ</button>
+      </div>
+
+      <style jsx>{`.page{ padding:24px }`}</style>
     </div>
-  );
+  )
 }
