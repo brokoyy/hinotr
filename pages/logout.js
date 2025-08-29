@@ -1,17 +1,21 @@
-// pages/logout.js
-import { useEffect } from "react";
+import React, { useContext, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { NostrContext } from '../lib/nostr'
 
-export default function Logout() {
+export default function Logout(){
+  const { logout } = useContext(NostrContext)
+  const router = useRouter()
+
   useEffect(() => {
-    localStorage.removeItem("nip07LoggedIn"); // ローカル保存してる場合
-    setTimeout(() => {
-      window.location.href = "/";
-    }, 500);
-  }, []);
+    logout()
+    const t = setTimeout(() => { router.replace('/') }, 500)
+    return () => clearTimeout(t)
+  }, []) // eslint-disable-line
 
   return (
-    <div className="p-4">
-      <p>ログアウト中...</p>
+    <div className="page">
+      <p>ログアウトしています…</p>
+      <style jsx>{`.page{ padding:24px }`}</style>
     </div>
-  );
+  )
 }
