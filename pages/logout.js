@@ -1,21 +1,21 @@
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
-import useNostr from '../utils/useNostr';
+import React, { useContext, useEffect } from 'react'
+import { useRouter } from 'next/router'
+import { NostrContext } from '../lib/nostr'
 
-export default function Logout() {
-  const router = useRouter();
-  const { setPubkey } = useNostr();
+export default function Logout(){
+  const { logout } = useContext(NostrContext)
+  const router = useRouter()
 
   useEffect(() => {
-    setPubkey(null);
-    setTimeout(() => {
-      router.push('/');
-    }, 500);
-  }, []);
+    logout()
+    const t = setTimeout(() => { router.replace('/') }, 500)
+    return () => clearTimeout(t)
+  }, []) // eslint-disable-line
 
   return (
-    <div className="p-6">
-      <p>Logging out...</p>
+    <div className="page">
+      <p>ログアウトしています…</p>
+      <style jsx>{`.page{ padding:24px }`}</style>
     </div>
-  );
+  )
 }
