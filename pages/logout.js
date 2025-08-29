@@ -1,21 +1,20 @@
-import React, { useContext, useEffect } from 'react'
-import { useRouter } from 'next/router'
-import { NostrContext } from '../lib/nostr'
+import { useRouter } from "next/router";
+import { useEffect } from "react";
+import TopButton from "@/components/TopButton";
 
-export default function Logout(){
-  const { logout } = useContext(NostrContext)
-  const router = useRouter()
+export default function Logout() {
+  const router = useRouter();
 
   useEffect(() => {
-    logout()
-    const t = setTimeout(() => { router.replace('/') }, 500)
-    return () => clearTimeout(t)
-  }, []) // eslint-disable-line
+    setTimeout(() => {
+      router.push("/");
+    }, 500);
+  }, [router]);
 
   return (
-    <div className="page">
-      <p>ログアウトしています…</p>
-      <style jsx>{`.page{ padding:24px }`}</style>
+    <div className="p-6">
+      <TopButton />
+      <h1 className="text-xl font-bold mt-12">ログアウト中...</h1>
     </div>
-  )
+  );
 }
