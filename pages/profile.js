@@ -1,40 +1,38 @@
-import React, { useContext, useEffect, useState } from 'react'
-import { NostrContext, identiconSvg } from '../lib/nostr'
-import { useRouter } from 'next/router'
-import { subscribeMetadata } from '../lib/nostr'
+import { useEffect, useState } from 'react';
+import { getPublicKey } from 'nostr-tools';
 
+export default function Profile() {
+  const [profile, setProfile] = useState(null);
 
-export default function Profile(){
-const { pubkey, relays } = useContext(NostrContext)
-const router = useRouter()
-const [meta, setMeta] = useState(null)
+  useEffect(() => {
+    const pubkey = localStorage.getItem('pubkey');
+    if (!pubkey) return;
 
+    async function fetchProfile() {
+      try {
+        const metadata = JSON.parse(localStorage.getItem('profile') || '{}');
+        setProfile(metadata);
+      } catch (err) {
+        console.error("プロフィール取得エラー:", err);
+      }
+    }
+    fetchProfile();
+  }, []);
 
-useEffect(()=>{
-if (!pubkey) { if (typeof window !== 'undefined') router.push('/'); return }
-let mounted = true
-subscribeMetadata([pubkey], relays, (pk, parsed)=>{ if (mounted) setMeta(parsed) })
-return ()=>{ mounted=false }
-}, [pubkey, relays])
+  if (!profile) {
+    return <div className="p-4">プロフィール情報がありません</div>;
+  }
 
-
-if (!pubkey) return null
-
-
-return (
-<div className="page center">
-<h1>プロフィール</h1>
-<img src={meta?.picture || identiconSvg(pubkey,120)} alt="avatar" style={{borderRadius:18,width:120,height:120,objectFit:'cover'}} />
-<div className="name">{meta?.name || pubkey}</div>
-{meta?.about && <div className="about">{meta.about}</div>}
-
-
-<style jsx>{`
-.page{ padding:24px }
-.center{ display:flex; flex-direction:column; align-items:center }
-.name{ margin-top:12px; font-weight:bold; word-break:break-all }
-.about{ margin-top:8px; color:#444; text-align:center; max-width:320px }
-`}</style>
-</div>
-)
+  return (
+    <div className="flex flex-col items-center p-6">
+      {profile.picture && (
+        <img
+          src={profile.picture}
+          alt="avatar"
+          className="w-24 h-24 rounded-full mb-4"
+        />
+      )}
+      <h2 className="text-xl font-bold">{profile.name || 'No Name'}</h2>
+    </div>
+  );
 }
