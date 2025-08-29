@@ -1,42 +1,51 @@
-import { useEffect, useState } from 'react';
-import { Relay } from 'nostr-tools';
+import { useEffect, useState } from "react";
+import { relayPool } from "nostr-tools";
 
-export default function Timeline() {
+export default function Timeline({ pubkey, relays }) {
   const [events, setEvents] = useState([]);
-  const [profiles, setProfiles] = useState({});
 
   useEffect(() => {
-    const relays = ["wss://relay.damus.io", "wss://relay.nostr.band"];
-    const subs = [];
+    if (!pubkey) return;
 
-    relays.forEach(url => {
-      const relay = new Relay(url);
-      relay.connect().then(() => {
-        const sub = relay.sub([{ kinds: [1], limit: 20 }]);
-        sub.on('event', (event) => {
-          setEvents(prev => [event, ...prev].slice(0, 50));
-        });
-        subs.push(sub);
+    const pool = relayPool();
+    relays.forEach((url) => pool.addRelay(url));
+
+    const sub = pool.sub({
+      filter: {
+        kinds: [1],
+        limit: 20,
+      },
+    });
+
+    sub.on("event", (event) => {
+      setEvents((prev) => {
+        if (prev.find((e) => e.id === event.id)) return prev;
+        return [event, ...prev].slice(0, 50);
       });
     });
 
-    return () => subs.forEach(sub => sub.unsub());
-  }, []);
+    return () => {
+      sub.unsub();
+    };
+  }, [pubkey, relays]);
+
+  if (!events.length) return <p className="p-4">Loading timeline...</p>;
 
   return (
     <div className="p-4 space-y-4">
-      {events.map((ev) => (
-        <div key={ev.id} className="flex items-start space-x-3 border-b pb-3">
+      {events.map((event) => (
+        <div
+          key={event.id}
+          className="flex items-start space-x-2 border-b pb-2"
+        >
           <img
-            src={profiles[ev.pubkey]?.picture || "/default-avatar.png"}
-            alt="avatar"
-            className="w-10 h-10 rounded-full object-cover"
+            src={`https://robohash.org/${event.pubkey}.png?size=50x50`}
+            alt="icon"
+            className="w-10 h-10 rounded-full"
           />
           <div>
-            <div className="font-bold">
-              {profiles[ev.pubkey]?.name || ev.pubkey.slice(0, 8)}
-            </div>
-            <div>{ev.content}</div>
+            <p className="text-sm text-gray-500">{event.pubkey.slice(0, 8)}...</p>
+            <p>{event.content}</p>
           </div>
         </div>
       ))}
