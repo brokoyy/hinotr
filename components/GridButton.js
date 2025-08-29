@@ -13,15 +13,16 @@ export default function GridButton({ index, label, subtitle, onClick, disabled }
 
       <style jsx>{`
         .grid-button {
+          width: 100%;
+          min-height: 140px;
           background: #fff;
           border-radius: 12px;
           padding: 18px;
-          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          height: 120px;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.06);
           cursor: pointer;
           text-align: center;
           transition: transform 0.1s, box-shadow 0.1s;
