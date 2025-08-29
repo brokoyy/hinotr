@@ -1,14 +1,22 @@
-import { useRouter } from "next/router";
-import { useEffect } from "react";
+"use client";
+import { useRouter } from "next/navigation";
 
 export default function Logout() {
   const router = useRouter();
 
-  useEffect(() => {
-    // ログアウト処理（特にNIP-07は秘密鍵を保存しないのでセッションだけリセット）
-    localStorage.removeItem("loggedIn");
+  const handleLogout = () => {
+    localStorage.removeItem("nostr_key"); // 保存してた秘密鍵などを削除
     router.push("/");
-  }, [router]);
+  };
 
-  return <p>Logging out...</p>;
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <button
+        onClick={handleLogout}
+        className="px-6 py-3 bg-red-500 text-white rounded-2xl shadow"
+      >
+        ログアウト
+      </button>
+    </div>
+  );
 }
