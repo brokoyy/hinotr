@@ -1,72 +1,73 @@
 // pages/timeline.js
-import React, { useEffect, useState } from "react";
-import { getRelays, publishEvent } from "../lib/nostr";
+import { useEffect, useState } from 'react';
+import { defaultRelays, fetchProfile, postEvent } from '../lib/nostr';
 
 export default function Timeline() {
   const [events, setEvents] = useState([]);
-  const [content, setContent] = useState("");
+  const [message, setMessage] = useState('');
+  const [profiles, setProfiles] = useState({});
 
   useEffect(() => {
-    const fetchEvents = async () => {
-      const relays = getRelays();
-      const connections = relays.map(url => {
-        const r = window.nostr ? window.nostr : null; // Nostr接続確認
-        return r;
+    const relays = defaultRelays.map(url => {
+      const r = window.nostrTools.relayInit(url);
+      r.connect();
+      r.on('event', async (event) => {
+        if (event.kind === 1) {
+          setEvents(prev => [event, ...prev]);
+          if (!profiles[event.pubkey]) {
+            const p = await fetchProfile(event.pubkey);
+            setProfiles(prev => ({ ...prev, [event.pubkey]: p }));
+          }
+        }
       });
-      // ここは簡易表示のためダミー
-      setEvents([{ id: 1, content: "タイムラインサンプル投稿" }]);
-    };
-    fetchEvents();
+      r.on('connect', () => {
+        r.subscribe({ kinds: [1] });
+      });
+      return r;
+    });
+
+    return () => relays.forEach(r => r.close());
   }, []);
 
-  const handleSend = async () => {
-    if (!content) return;
+  async function sendMessage() {
+    if (!message) return;
+    const pubkey = await window.nostr.getPublicKey();
     const event = {
       kind: 1,
-      content,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: []
+      content: message,
+      pubkey,
+      created_at: Math.floor(Date.now() / 1000)
     };
-    try {
-      await publishEvent(event);
-      setEvents(prev => [...prev, { id: prev.length + 1, content }]);
-      setContent("");
-    } catch (e) {
-      console.error(e);
-      alert("送信失敗");
-    }
-  };
+    event.id = window.nostrTools.getEventHash(event);
+    event.sig = await window.nostr.signEvent(event);
+    postEvent(event);
+    setMessage('');
+  }
 
   return (
-    <div className="p-4">
-      <button
-        className="mb-4 bg-gray-200 p-2 rounded"
-        onClick={() => (window.location.href = "/")}
-      >
-        トップに戻る
-      </button>
-      <div className="mb-4">
-        <textarea
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          className="w-full border p-2"
-          rows={3}
-          placeholder="投稿内容"
-        />
-        <button
-          onClick={handleSend}
-          className="mt-2 bg-green-500 text-white p-2 rounded"
-        >
-          投稿
-        </button>
-      </div>
+    <div>
+      <button onClick={() => window.location.href = '/'}>トップに戻る</button>
+      <h2>タイムライン</h2>
       <div>
-        {events.map(e => (
-          <div key={e.id} className="border-b py-1">
-            {e.content}
-          </div>
-        ))}
+        <input 
+          type="text" 
+          value={message} 
+          onChange={e => setMessage(e.target.value)} 
+          placeholder="投稿内容" 
+        />
+        <button onClick={sendMessage}>送信</button>
       </div>
+      <ul>
+        {events.map((e, idx) => {
+          const p = profiles[e.pubkey] || {};
+          return (
+            <li key={idx}>
+              <img src={p.picture || '/default_icon.png'} width={40} height={40} alt="icon"/>
+              <strong>{p.name || 'No Name'}</strong>: {e.content}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
