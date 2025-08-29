@@ -1,41 +1,46 @@
-import { useEffect, useState } from 'react';
-import useNostr from '../utils/useNostr';
+import React, { useContext, useEffect, useState } from 'react'
+import { NostrContext, identiconSvg } from '../lib/nostr'
+import { useRouter } from 'next/router'
 
-export default function Profile() {
-  const { pubkey, relays } = useNostr();
-  const [profile, setProfile] = useState(null);
+export default function Profile(){
+  const { pubkey, getProfile } = useContext(NostrContext)
+  const router = useRouter()
+  const [meta, setMeta] = useState(null)
 
   useEffect(() => {
-    if (!pubkey || relays.length === 0) return;
+    if (typeof window === 'undefined') return
+    if (!pubkey) { router.replace('/'); return }
+    let live = true
+    ;(async () => {
+      const p = await getProfile(pubkey)
+      if (!live) return
+      setMeta(p)
+    })()
+    return () => { live = false }
+  }, [pubkey])
 
-    relays.forEach((relay) => {
-      const sub = relay.sub([{ kinds: [0], authors: [pubkey] }]);
-      sub.on('event', (event) => {
-        try {
-          const content = JSON.parse(event.content);
-          setProfile({
-            name: content.display_name || content.name || "No Name",
-            picture: content.picture || null,
-          });
-        } catch (e) {
-          console.error("Failed to parse profile", e);
-        }
-      });
-    });
-  }, [pubkey, relays]);
+  if (!pubkey) return null
+
+  const displayName = meta?.name || `${pubkey.slice(0,8)}…${pubkey.slice(-4)}`
 
   return (
-    <div className="p-6">
-      {profile ? (
-        <div className="flex items-center space-x-4">
-          {profile.picture && (
-            <img src={profile.picture} alt="icon" className="w-16 h-16 rounded-full" />
-          )}
-          <h2 className="text-xl font-bold">{profile.name}</h2>
-        </div>
-      ) : (
-        <p>Loading profile...</p>
-      )}
+    <div className="page center">
+      <h1>プロフィール</h1>
+      <img
+        src={meta?.picture || identiconSvg(pubkey, 80)}
+        alt="avatar"
+        className="avatar"
+      />
+      <div className="name">{displayName}</div>
+      {meta?.about && <div className="about">{meta.about}</div>}
+
+      <style jsx>{`
+        .page{ padding:24px }
+        .center{ display:flex; flex-direction:column; align-items:center }
+        .avatar{ width:80px; height:80px; border-radius:9999px; object-fit:cover }
+        .name{ margin-top:12px; font-weight:600; word-break:break-all }
+        .about{ margin-top:8px; color:#444; text-align:center; max-width:320px; white-space:pre-wrap }
+      `}</style>
     </div>
-  );
+  )
 }
