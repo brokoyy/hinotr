@@ -1,34 +1,46 @@
-// pages/profile.js
-import { useEffect, useState } from 'react';
-import { fetchProfile } from '../lib/nostr';
-import { getPublicKey } from '../lib/nostr'; // NIP-07から取得する関数
+import React, { useContext, useEffect, useState } from 'react'
+import { NostrContext, identiconSvg } from '../lib/nostr'
+import { useRouter } from 'next/router'
 
-export default function Profile() {
-  const [profile, setProfile] = useState({});
-  const [pubkey, setPubkey] = useState('');
+export default function Profile(){
+  const { pubkey, getProfile } = useContext(NostrContext)
+  const router = useRouter()
+  const [meta, setMeta] = useState(null)
 
   useEffect(() => {
-    async function loadProfile() {
-      const pk = await window.nostr.getPublicKey();
-      setPubkey(pk);
-      const p = await fetchProfile(pk);
-      setProfile(p);
-    }
-    loadProfile();
-  }, []);
+    if (typeof window === 'undefined') return
+    if (!pubkey) { router.replace('/'); return }
+    let live = true
+    ;(async () => {
+      const p = await getProfile(pubkey)
+      if (!live) return
+      setMeta(p)
+    })()
+    return () => { live = false }
+  }, [pubkey])
+
+  if (!pubkey) return null
+
+  const displayName = meta?.name || `${pubkey.slice(0,8)}…${pubkey.slice(-4)}`
 
   return (
-    <div>
-      <button onClick={() => window.location.href = '/'}>トップに戻る</button>
-      <h2>プロフィール</h2>
-      {pubkey ? (
-        <div>
-          <img src={profile.picture || '/default_icon.png'} alt="icon" width={50} height={50}/>
-          <p>{profile.name || 'No Name'}</p>
-        </div>
-      ) : (
-        <p>ログインしてください</p>
-      )}
+    <div className="page center">
+      <h1>プロフィール</h1>
+      <img
+        src={meta?.picture || identiconSvg(pubkey, 80)}
+        alt="avatar"
+        className="avatar"
+      />
+      <div className="name">{displayName}</div>
+      {meta?.about && <div className="about">{meta.about}</div>}
+
+      <style jsx>{`
+        .page{ padding:24px }
+        .center{ display:flex; flex-direction:column; align-items:center }
+        .avatar{ width:80px; height:80px; border-radius:9999px; object-fit:cover }
+        .name{ margin-top:12px; font-weight:600; word-break:break-all }
+        .about{ margin-top:8px; color:#444; text-align:center; max-width:320px; white-space:pre-wrap }
+      `}</style>
     </div>
-  );
+  )
 }
