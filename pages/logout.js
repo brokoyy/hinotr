@@ -1,22 +1,16 @@
+import { useEffect } from "react";
 import { useRouter } from "next/router";
 
-export default function Logout({ setPubkey }) {
+export default function Logout() {
   const router = useRouter();
 
-  const handleLogout = () => {
-    setPubkey(null);
-    // ルートページへ戻す
-    router.push("/");
-  };
+  useEffect(() => {
+    localStorage.removeItem("pubkey");
+    // 少し待ってからトップへ戻る
+    setTimeout(() => {
+      router.push("/");
+    }, 300);
+  }, [router]);
 
-  return (
-    <div className="p-4">
-      <button
-        onClick={handleLogout}
-        className="px-4 py-2 bg-red-500 text-white rounded-lg"
-      >
-        ログアウト
-      </button>
-    </div>
-  );
+  return <div className="p-4">Logging out...</div>;
 }
