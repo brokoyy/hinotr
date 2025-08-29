@@ -1,57 +1,57 @@
 import { useEffect, useState } from "react";
-import { relayInit } from "nostr-tools";
+import { useRouter } from "next/router";
+import { SimplePool } from "nostr-tools";
 
-export default function Profile({ pubkey, relays }) {
+const relays = [
+  "wss://relay.nostr.band",
+  "wss://relay-jp.nostr.wirednet.jp",
+  "wss://yabu.me",
+  "wss://r.kojira.io"
+];
+
+export default function Profile() {
   const [profile, setProfile] = useState(null);
+  const router = useRouter();
 
   useEffect(() => {
-    if (!pubkey) return;
-    async function fetchProfile() {
-      const relay = relayInit(relays[0]);
-      await relay.connect();
-
-      relay.on("connect", () => {
-        console.log(`connected to ${relay.url}`);
-      });
-
-      relay.on("error", () => {
-        console.log(`failed to connect to ${relay.url}`);
-      });
-
-      let sub = relay.sub([
-        {
-          kinds: [0],
-          authors: [pubkey],
-          limit: 1,
-        },
-      ]);
-
-      sub.on("event", (event) => {
-        try {
-          const metadata = JSON.parse(event.content);
-          setProfile(metadata);
-        } catch (e) {
-          console.error("Failed to parse metadata", e);
-        }
-      });
-
-      sub.on("eose", () => {
-        sub.unsub();
-      });
+    const pubkey = localStorage.getItem("pubkey");
+    if (!pubkey) {
+      router.push("/");
+      return;
     }
-    fetchProfile();
-  }, [pubkey, relays]);
 
-  if (!profile) return <p>Loading profile...</p>;
+    const pool = new SimplePool();
+    const sub = pool.sub(relays, [{ kinds: [0], authors: [pubkey] }]);
+
+    sub.on("event", (event) => {
+      try {
+        const content = JSON.parse(event.content);
+        setProfile(content);
+      } catch (e) {
+        console.error("Invalid profile event:", e);
+      }
+    });
+
+    return () => {
+      sub.unsub();
+      pool.close(relays);
+    };
+  }, [router]);
+
+  if (!profile) return <div className="p-4">Loading...</div>;
 
   return (
-    <div className="p-4">
-      <img
-        src={profile.picture}
-        alt="icon"
-        className="w-16 h-16 rounded-full mb-2"
-      />
-      <h2 className="text-xl font-bold">{profile.name || "No Name"}</h2>
+    <div className="p-4 flex flex-col items-center">
+      {profile.picture && (
+        <img
+          src={profile.picture}
+          alt="icon"
+          className="w-24 h-24 rounded-full mb-2"
+        />
+      )}
+      <h2 className="text-lg font-bold">
+        {profile.display_name || profile.name || "No Name"}
+      </h2>
     </div>
   );
 }
