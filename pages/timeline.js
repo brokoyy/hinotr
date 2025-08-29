@@ -1,75 +1,40 @@
 import { useEffect, useState } from "react";
-import { relayInit, getEventHash, signEvent } from "nostr-tools";
-import TopButton from "@/components/TopButton";
+import { fetchTimeline, postMessage } from "../lib/nostr";
 
-export default function Timeline() {
-  const [events, setEvents] = useState([]);
-  const [text, setText] = useState("");
-  const relays = [
-    "wss://relay.nostr.band/",
-    "wss://relay-jp.nostr.wirednet.jp/",
-    "wss://yabu.me/",
-    "wss://r.kojira.io/",
-  ];
+export default function Timeline({ setView }) {
+  const [timeline, setTimeline] = useState([]);
+  const [newPost, setNewPost] = useState("");
 
   useEffect(() => {
-    async function fetchTimeline() {
-      const relay = relayInit(relays[0]);
-      await relay.connect();
-
-      const sub = relay.sub([{ kinds: [1], limit: 20 }]);
-
-      sub.on("event", (event) => {
-        setEvents((prev) => [event, ...prev]);
-      });
-    }
-    fetchTimeline();
+    fetchTimeline((event) => {
+      setTimeline(prev => [event, ...prev]);
+    });
   }, []);
 
-  const handleSubmit = async () => {
-    if (!text) return;
-
-    const event = {
-      kind: 1,
-      created_at: Math.floor(Date.now() / 1000),
-      tags: [],
-      content: text,
-      pubkey: "あなたの公開鍵をここに",
-    };
-    event.id = getEventHash(event);
-    // 実際は署名が必要 → signEvent を呼ぶ
-    // event.sig = signEvent(event, 秘密鍵);
-
-    for (const url of relays) {
-      const relay = relayInit(url);
-      await relay.connect();
-      relay.publish(event);
-    }
-    setText("");
+  const handlePost = async () => {
+    if (!newPost) return;
+    await postMessage(newPost);
+    setNewPost("");
   };
 
   return (
-    <div className="p-6">
-      <TopButton />
-      <h1 className="text-xl font-bold mt-12">タイムライン</h1>
-      <div className="mt-4">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full border p-2 rounded"
-          placeholder="投稿を書く..."
+    <div>
+      <button style={{ position: "fixed", top: 10, left: 10 }} onClick={() => setView("top")}>
+        トップに戻る
+      </button>
+      <div>
+        <input
+          value={newPost}
+          onChange={e => setNewPost(e.target.value)}
+          placeholder="投稿内容"
         />
-        <button
-          onClick={handleSubmit}
-          className="mt-2 px-4 py-1 bg-green-500 text-white rounded"
-        >
-          投稿
-        </button>
+        <button onClick={handlePost}>送信</button>
       </div>
-      <div className="mt-6">
-        {events.map((ev) => (
-          <div key={ev.id} className="border-b py-2">
-            {ev.content}
+      <div>
+        {timeline.map((e, i) => (
+          <div key={i}>
+            <img src={`https://robohash.org/${e.pubkey}`} alt="icon" style={{ width: 40, height: 40 }} />
+            <span>{e.content}</span>
           </div>
         ))}
       </div>
