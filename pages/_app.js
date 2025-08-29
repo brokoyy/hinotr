@@ -1,11 +1,11 @@
 // pages/_app.js
-import { NostrProvider } from "../lib/nostr";
-import "../styles/globals.css";
+import '../styles/globals.css'
+import { NostrProvider } from '../lib/nostr'
 
 export default function MyApp({ Component, pageProps }) {
   return (
     <NostrProvider>
       <Component {...pageProps} />
     </NostrProvider>
-  );
+  )
 }
