@@ -20,6 +20,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const fetchFollows = async () => {
       setLoading(true);
       try {
+        console.log('フォローリスト取得開始:', pubkey);
         const queryFilter: Filter = {
           kinds: [3],
           authors: [pubkey],
@@ -32,14 +33,15 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
             const followPubkeys = events[0].tags
               .filter((tag: string[]) => tag[0] === 'p')
               .map((tag: string[]) => tag[1]);
-            // 自分＋フォロー対象のpubkeyをセット
+            console.log('フォロー数:', followPubkeys.length);
             setFollows([...followPubkeys, pubkey]);
           } else {
+            console.log('フォローイベントが見つかりません。自分のみセット');
             setFollows([pubkey]);
           }
         }
       } catch (error) {
-        console.error('フォローリストの取得に失敗:', error);
+        console.error('フォローリスト取得エラー:', error);
         if (isMounted) setFollows([pubkey]);
       }
     };
@@ -55,7 +57,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   useEffect(() => {
     let isMounted = true;
 
-    // ログイン中かつフォローリスト取得前なら、取得完了まで待つ
     if (pubkey && follows.length === 0) {
       return;
     }
@@ -65,7 +66,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const now = Math.floor(Date.now() / 1000);
     const filter: Filter = { kinds: [1] };
 
-    // 対象の指定（ログインしている場合はフォロー＋自分、未ログインなら自分のみ）
     if (follows.length > 0) {
       filter.authors = follows;
     } else if (pubkey) {
@@ -77,11 +77,9 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
 
     if (mode === 'PHANTOM') {
-      // 10分（600秒）前以降の投稿のみを取得するよう指定
-      filter.since = now - 600;
+      filter.since = now - 600; // 10分前
       filter.limit = 100;
     } else {
-      // HINOTORI モード: 1年前の6時間分を取得
       const ONE_YEAR = 365 * 24 * 60 * 60;
       const SIX_HOURS = 6 * 60 * 60;
       const oneYearAgoNow = now - ONE_YEAR;
@@ -93,13 +91,16 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     const fetchPosts = async () => {
       try {
+        console.log('投稿取得フィルター:', filter);
         const fetchedEvents = (await pool.querySync(DEFAULT_RELAYS, [filter] as any)) as NostrEvent[];
+        console.log('取得された投稿数:', fetchedEvents.length);
+
         if (isMounted) {
           const sorted = fetchedEvents.sort((a, b) => b.created_at - a.created_at);
           setPosts(sorted);
         }
       } catch (e) {
-        console.error('投稿の取得失敗:', e);
+        console.error('投稿取得エラー:', e);
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -107,7 +108,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     fetchPosts();
 
-    // PHANTOM モードの場合のみリアルタイム受信
     if (mode === 'PHANTOM') {
       const sub = pool.subscribeMany(DEFAULT_RELAYS, [filter] as any, {
         onevent(event: NostrEvent) {
@@ -126,7 +126,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
   }, [follows, mode, pubkey]);
 
-  // 3. PHANTOMモードでの10分消去 ＆ 9分フェードアウトタイマー処理
+  // 3. 10分消去 ＆ 9分フェードアウトタイマー
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 

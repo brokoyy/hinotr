@@ -2,10 +2,10 @@ import { SimplePool } from 'nostr-tools';
 
 // デフォルト接続用リレイ（日本の主要リレイなど）
 export const DEFAULT_RELAYS = [
-  'wss://r.kojira.io',
   'wss://relay-jp.nostr.wirednet.jp',
+  'wss://r.kojira.io',
+  'wss://yabu.me',
   'wss://nos.lol',
-  'wss://relay.nostr.band',
 ];
 
 // SimplePoolのインスタンス作成
