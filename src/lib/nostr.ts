@@ -1,27 +1,34 @@
-import { SimplePool } from 'nostr-tools';
+import { SimplePool } from 'nostr-tools/pool';
 
-// デフォルト接続用リレイ（日本の主要リレイなど）
+export const pool = new SimplePool();
+
 export const DEFAULT_RELAYS = [
+  'wss://yabu.me',
   'wss://relay-jp.nostr.wirednet.jp',
   'wss://r.kojira.io',
-  'wss://yabu.me',
+  'wss://relay.damus.io',
   'wss://nos.lol',
 ];
 
-// SimplePoolのインスタンス作成
-export const pool = new SimplePool();
+const RELAY_STORAGE_KEY = 'hinotr_user_relays';
 
-// NIP-07によるログイン処理
-export async function loginWithNip07(): Promise<string | null> {
-  if (!window.nostr) {
-    alert('NIP-07拡張機能（nos2x, Albyなど）が見つかりません。');
-    return null;
-  }
+export const getStoredRelays = (): string[] => {
   try {
-    const pubkey = await window.nostr.getPublicKey();
-    return pubkey;
-  } catch (error) {
-    console.error('ログインに失敗しました:', error);
-    return null;
+    const saved = localStorage.getItem(RELAY_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('リレー設定の読み込みエラー:', e);
   }
-}
+  return DEFAULT_RELAYS;
+};
+
+export const saveStoredRelays = (relays: string[]) => {
+  // RELAYS_STORAGE_KEY -> RELAY_STORAGE_KEY に修正
+  localStorage.setItem(RELAY_STORAGE_KEY, JSON.stringify(relays));
+  window.dispatchEvent(new Event('hinotr_relays_updated'));
+};
