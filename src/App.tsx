@@ -16,19 +16,15 @@ export default function App() {
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-  // 画面ロード時に localStorage から pubkey を復元
   useEffect(() => {
     const savedKey = localStorage.getItem(STORAGE_KEY_PUBKEY);
     if (savedKey) {
-      console.log('保存された pubkey を復元しました:', savedKey);
       setPubkey(savedKey);
     }
   }, []);
 
-  // NIP-65 対応の動的リレーリストも受け取る
-  const { posts, loading, relays } = useNostrTimeline(pubkey, mode);
+  const { posts, loading, relays, userProfile } = useNostrTimeline(pubkey, mode);
 
-  // ログイン処理
   const handleLogin = async () => {
     const key = await loginWithNip07();
     if (key) {
@@ -37,7 +33,6 @@ export default function App() {
     }
   };
 
-  // ログアウト処理
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_KEY_PUBKEY);
     setPubkey(null);
@@ -63,6 +58,7 @@ export default function App() {
           theme={theme}
           setTheme={setTheme}
           pubkey={pubkey}
+          userProfile={userProfile}
           onLogin={handleLogin}
           onOpenSettings={() => setIsSettingsOpen(true)}
         />
@@ -74,15 +70,25 @@ export default function App() {
             </div>
           )}
 
-          {!loading && posts.length === 0 && (
-            <div className="p-8 text-center text-xs opacity-60">
-              {pubkey
-                ? '表示できる投稿がありません。'
-                : 'NIP-07でログインするとフォロー中のタイムラインが表示されます。'}
+          {!loading && !pubkey && (
+            <div className="p-12 text-center text-sm opacity-80 flex flex-col items-center gap-4">
+              <p>NIP-07 拡張機能でログインするとタイムラインが表示されます。</p>
+              <button
+                onClick={handleLogin}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-md transition"
+              >
+                NIP-07 でログイン
+              </button>
             </div>
           )}
 
-          {posts.map((post) => (
+          {!loading && pubkey && posts.length === 0 && (
+            <div className="p-8 text-center text-xs opacity-60">
+              表示できる投稿がありません。
+            </div>
+          )}
+
+          {pubkey && posts.map((post) => (
             <PostCard key={post.id} post={post} mode={mode} />
           ))}
         </main>
@@ -102,7 +108,6 @@ export default function App() {
           onClose={() => setIsPostFormOpen(false)}
         />
 
-        {/* 設定モーダル（接続中リレーの確認＆ログアウト） */}
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}

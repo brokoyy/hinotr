@@ -2,56 +2,73 @@ import { useState, useEffect } from 'react';
 import type { NostrEvent, AppMode, TimelinePost } from '../types/nostr';
 import { pool, DEFAULT_RELAYS, parseNip65Relays } from '../lib/nostr';
 
+export interface UserProfile {
+  picture?: string;
+  name?: string;
+}
+
 export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   const [posts, setPosts] = useState<TimelinePost[]>([]);
   const [follows, setFollows] = useState<string[]>([]);
   const [relays, setRelays] = useState<string[]>(DEFAULT_RELAYS);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
 
-  // 1. NIP-65 (Kind 10002) リレーリストの取得
+  // 1. NIP-65 (Kind 10002) リレーリスト & ユーザープロフィール(Kind 0)の取得
   useEffect(() => {
     let isMounted = true;
 
     if (!pubkey) {
       setRelays(DEFAULT_RELAYS);
+      setUserProfile(null);
       return;
     }
 
-    const fetchUserRelays = async () => {
+    const fetchUserData = async () => {
       try {
         const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://purplepag.es']));
-        const events = await pool.querySync(searchTarget, {
+        
+        // リレーリスト取得
+        const relayEvents = await pool.querySync(searchTarget, {
           kinds: [10002],
           authors: [pubkey],
           limit: 1,
         });
 
-        if (isMounted && events.length > 0) {
-          const userRelays = parseNip65Relays(events[0]);
+        if (isMounted && relayEvents.length > 0) {
+          const userRelays = parseNip65Relays(relayEvents[0]);
           if (userRelays.length > 0) {
-            console.log('NIP-65リレー設定を適用:', userRelays);
             setRelays(userRelays);
-            return;
           }
         }
-      } catch (e) {
-        console.error('NIP-65の取得失敗:', e);
-      }
 
-      if (isMounted) {
-        console.log('NIP-65未設定または失敗のためデフォルトリレーを使用');
-        setRelays(DEFAULT_RELAYS);
+        // プロフィール(Kind 0)取得
+        const profileEvents = await pool.querySync(searchTarget, {
+          kinds: [0],
+          authors: [pubkey],
+          limit: 1,
+        });
+
+        if (isMounted && profileEvents.length > 0) {
+          const metadata = JSON.parse(profileEvents[0].content);
+          setUserProfile({
+            picture: metadata.picture,
+            name: metadata.display_name || metadata.name,
+          });
+        }
+      } catch (e) {
+        console.error('ユーザーデータの取得失敗:', e);
       }
     };
 
-    fetchUserRelays();
+    fetchUserData();
 
     return () => {
       isMounted = false;
     };
   }, [pubkey]);
 
-  // 2. pubkey に基づいてフォローリストを取得 (Kind 3)
+  // 2. フォローリスト取得 (Kind 3)
   useEffect(() => {
     let isMounted = true;
 
@@ -93,9 +110,16 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
   }, [pubkey, relays]);
 
-  // 3. タイムラインの取得とリアルタイム購読
+  // 3. タイムラインの取得（未ログイン時は何も取得しない）
   useEffect(() => {
     let isMounted = true;
+
+    if (!pubkey) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setPosts([]);
 
@@ -103,13 +127,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     let filter: any = {};
 
     if (mode === 'PHANTOM') {
-      filter = {
-        kinds: [1],
-        limit: 50,
-      };
-      if (follows.length > 0) {
-        filter.authors = follows;
-      }
+      filter = { kinds: [1], limit: 50 };
+      if (follows.length > 0) filter.authors = follows;
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
       const SIX_HOURS = 6 * 60 * 60;
@@ -121,9 +140,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         until: oneYearAgoNow,
         limit: 200,
       };
-      if (follows.length > 0) {
-        filter.authors = follows;
-      }
+      if (follows.length > 0) filter.authors = follows;
     }
 
     const fetchPosts = async () => {
@@ -160,7 +177,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
   }, [follows, mode, pubkey, relays]);
 
-  // 4. PHANTOMモードでのフェードアウトタイマー処理
+  // 4. PHANTOMタイマー
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 
@@ -180,5 +197,5 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => clearInterval(interval);
   }, [mode]);
 
-  return { posts, loading, relays };
+  return { posts, loading, relays, userProfile };
 }
