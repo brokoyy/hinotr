@@ -219,15 +219,16 @@ export function PostCard({ post, mode }: PostCardProps) {
   };
 
   const renderContent = (content: string) => {
-    const images = content.match(IMAGE_REGEX) || [];
-    const videos = content.match(VIDEO_REGEX) || [];
+    const images: string[] = (content.match(IMAGE_REGEX) || []) as string[];
+    const videos: string[] = (content.match(VIDEO_REGEX) || []) as string[];
     let textOnly = content
       .replace(IMAGE_REGEX, '')
       .replace(VIDEO_REGEX, '')
       .trim();
 
-    const otherUrls = (textOnly.match(GENERAL_URL_REGEX) || []).filter(
-      (url) => !images.includes(url) && !videos.includes(url)
+    const matchedUrls: string[] = (textOnly.match(GENERAL_URL_REGEX) || []) as string[];
+    const otherUrls = matchedUrls.filter(
+      (url: string) => !images.includes(url) && !videos.includes(url)
     );
 
     return (
