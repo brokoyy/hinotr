@@ -42,15 +42,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-xl text-gray-900 dark:text-gray-100 space-y-6">
         <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3">
-          <h2 className="text-xl font-bold">設定</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2">⚙️ 設定</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
             ✕
           </button>
         </div>
 
-        {/* リレー編集セクション */}
+        {/* リレー編集エリア */}
         <div className="space-y-4">
-          <h3 className="font-semibold text-md">リレー設定</h3>
+          <h3 className="font-semibold text-sm text-gray-500 dark:text-gray-400">接続中リレーの編集</h3>
+          
           <div className="flex gap-2">
             <input
               type="text"
@@ -61,7 +62,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             />
             <button
               onClick={handleAddRelay}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-xl hover:bg-blue-700 transition"
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 transition"
             >
               追加
             </button>
@@ -71,12 +72,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
             {relays.map((relay) => (
               <div
                 key={relay}
-                className="flex justify-between items-center bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded-lg text-sm"
+                className="flex justify-between items-center bg-gray-100 dark:bg-gray-700/50 px-3 py-2 rounded-lg text-xs font-mono"
               >
                 <span className="truncate mr-2">{relay}</span>
                 <button
                   onClick={() => handleRemoveRelay(relay)}
-                  className="text-red-500 hover:text-red-700 font-bold"
+                  className="text-red-500 hover:text-red-700 font-bold px-1"
                 >
                   削除
                 </button>
@@ -93,7 +94,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         </div>
 
         {/* 保存ボタン */}
-        <div className="pt-2">
+        <div>
           <button
             onClick={handleSave}
             className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition"
@@ -102,7 +103,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           </button>
         </div>
 
-        {/* ログアウトエリア */}
+        {/* ログアウトボタン */}
         <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
           <button
             onClick={() => {

@@ -31,38 +31,53 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     const fetchFollows = async () => {
       setLoading(true);
-      try {
-        console.log('フォローリスト取得開始:', pubkey);
-        const searchRelays = Array.from(
-          new Set([...activeRelays, ...DEFAULT_RELAYS, 'wss://purplepag.es', 'wss://relay.nostr.band'])
-        );
+      console.log('フォローリスト(Kind 3) 検索開始:', pubkey);
 
-        const queryFilter: Filter = {
-          kinds: [3],
-          authors: [pubkey],
-          limit: 1,
-        };
+      const searchRelays = Array.from(
+        new Set([
+          ...activeRelays,
+          ...DEFAULT_RELAYS,
+          'wss://purplepag.es',
+          'wss://relay.nostr.band',
+          'wss://nos.lol',
+          'wss://relay.damus.io',
+        ])
+      );
 
-        const events = await pool.querySync(searchRelays, [queryFilter] as any);
+      const filter: Filter = {
+        kinds: [3],
+        authors: [pubkey],
+        limit: 1,
+      };
 
-        if (isMounted) {
-          if (events && events.length > 0) {
-            const latestEvent = events.sort((a: any, b: any) => b.created_at - a.created_at)[0];
-            const followPubkeys = latestEvent.tags
-              .filter((tag: string[]) => tag[0] === 'p')
-              .map((tag: string[]) => tag[1]);
+      let foundEvent: NostrEvent | null = null;
 
-            console.log('フォロー数取得成功:', followPubkeys.length);
-            setFollows([...followPubkeys, pubkey]);
-          } else {
-            console.warn('Kind 3 イベントが見つかりません。自分のみセット');
-            setFollows([pubkey]);
+      // 複数リレーから購読してKind 3を待つ
+      const sub = pool.subscribeMany(searchRelays, [filter] as any, {
+        onevent(event: NostrEvent) {
+          if (!foundEvent || event.created_at > foundEvent.created_at) {
+            foundEvent = event;
           }
+        },
+      });
+
+      // 2.5秒間リレーからの返答を待つ
+      setTimeout(() => {
+        sub.close();
+        if (!isMounted) return;
+
+        if (foundEvent) {
+          const followPubkeys = foundEvent.tags
+            .filter((tag: string[]) => tag[0] === 'p')
+            .map((tag: string[]) => tag[1]);
+
+          console.log('フォローリスト取得成功！件数:', followPubkeys.length);
+          setFollows([...followPubkeys, pubkey]);
+        } else {
+          console.warn('Kind 3 イベントが見つかりませんでした。自分のみをセットします。');
+          setFollows([pubkey]);
         }
-      } catch (error) {
-        console.error('フォローリスト取得エラー:', error);
-        if (isMounted) setFollows([pubkey]);
-      }
+      }, 2500);
     };
 
     fetchFollows();
@@ -111,7 +126,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const fetchPosts = async () => {
       try {
         console.log('投稿取得に使用するリレー:', activeRelays);
-        console.log('投稿取得フィルター:', filter);
+        console.log('投稿取得フィルター (authors数):', filter.authors?.length, filter);
         const fetchedEvents = (await pool.querySync(activeRelays, [filter] as any)) as NostrEvent[];
         console.log('取得された投稿数:', fetchedEvents.length);
 
