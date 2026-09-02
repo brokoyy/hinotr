@@ -1,25 +1,27 @@
-import { SimplePool } from 'nostr-tools/pool';
+import { SimplePool } from 'nostr-tools';
 
-export const pool = new SimplePool();
-
+// デフォルト接続用リレイ（日本の主要リレイなど）
 export const DEFAULT_RELAYS = [
-  'wss://yabu.me',
-  'wss://relay-jp.nostr.wirednet.jp',
   'wss://r.kojira.io',
-  'wss://relay.damus.io',
+  'wss://relay-jp.nostr.wirednet.jp',
   'wss://nos.lol',
+  'wss://relay.nostr.band',
 ];
 
-export const loginWithNip07 = async (): Promise<string | null> => {
-  if (typeof window === 'undefined' || !window.nostr) {
-    alert('NIP-07 拡張機能（nos2x, Albyなど）が見つかりません。');
+// SimplePoolのインスタンス作成
+export const pool = new SimplePool();
+
+// NIP-07によるログイン処理
+export async function loginWithNip07(): Promise<string | null> {
+  if (!window.nostr) {
+    alert('NIP-07拡張機能（nos2x, Albyなど）が見つかりません。');
     return null;
   }
   try {
     const pubkey = await window.nostr.getPublicKey();
     return pubkey;
-  } catch (e) {
-    console.error('NIP-07 ログインエラー:', e);
+  } catch (error) {
+    console.error('ログインに失敗しました:', error);
     return null;
   }
-};
+}
