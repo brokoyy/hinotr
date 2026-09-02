@@ -112,7 +112,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
   }, [follows, mode, pubkey]);
 
-  // 3. PHANTOMモードでのフェードアウトタイマー処理
+  // 3. PHANTOMモードでの10分消去 ＆ 9分フェードアウトタイマー処理
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 
@@ -121,10 +121,12 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
       setPosts((prevPosts) =>
         prevPosts
-          .filter((post) => now - post.created_at < 360)
+          // 10分（600秒）以上前の投稿は削除
+          .filter((post) => now - post.created_at < 600)
           .map((post) => ({
             ...post,
-            isFading: now - post.created_at >= 300,
+            // 9分（540秒）経過したら半透明（フェードアウト）
+            isFading: now - post.created_at >= 540,
           }))
       );
     }, 1000);
