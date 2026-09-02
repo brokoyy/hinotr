@@ -44,7 +44,7 @@ export default function App() {
       dark: 'bg-gradient-to-b from-black via-slate-950 to-blue-950 text-white',
     },
     HINOTORI: {
-      light: 'bg-gradient-to-b from-white to-orange-600 text-slate-900',
+      light: 'bg-gradient-to-b from-white to-orange-300 text-slate-900',
       dark: 'bg-gradient-to-b from-black via-orange-950 to-orange-900 text-white',
     },
   }[mode][theme];
