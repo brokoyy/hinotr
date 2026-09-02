@@ -28,7 +28,20 @@ export const getStoredRelays = (): string[] => {
 };
 
 export const saveStoredRelays = (relays: string[]) => {
-  // RELAYS_STORAGE_KEY -> RELAY_STORAGE_KEY に修正
   localStorage.setItem(RELAY_STORAGE_KEY, JSON.stringify(relays));
   window.dispatchEvent(new Event('hinotr_relays_updated'));
+};
+
+export const loginWithNip07 = async (): Promise<string | null> => {
+  if (typeof window === 'undefined' || !window.nostr) {
+    alert('NIP-07 拡張機能（nos2x, Albyなど）が見つかりません。');
+    return null;
+  }
+  try {
+    const pubkey = await window.nostr.getPublicKey();
+    return pubkey;
+  } catch (e) {
+    console.error('NIP-07 ログインエラー:', e);
+    return null;
+  }
 };
