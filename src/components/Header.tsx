@@ -23,20 +23,38 @@ export const Header: React.FC<HeaderProps> = ({
   onLogin,
   onOpenSettings,
 }) => {
+  const isDark = theme === 'dark';
+
   return (
-    <header className="sticky top-0 z-30 backdrop-blur-md bg-black/40 border-b border-white/10 px-4 py-3 flex items-center justify-between">
+    <header
+      className={`sticky top-0 z-30 backdrop-blur-md transition-colors duration-300 border-b px-4 py-3 flex items-center justify-between ${
+        isDark
+          ? 'bg-black/40 border-white/10 text-white'
+          : 'bg-white/80 border-gray-200 text-gray-900 shadow-sm'
+      }`}
+    >
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-white">hinotr</h1>
+        <h1 className="text-xl font-bold tracking-tight">hinotr</h1>
       </div>
 
       {/* モード切り替えタブ */}
-      <div className="flex items-center bg-black/30 p-1 rounded-xl text-xs font-semibold border border-white/10">
+      <div
+        className={`flex items-center p-1 rounded-xl text-xs font-semibold border ${
+          isDark
+            ? 'bg-black/30 border-white/10'
+            : 'bg-gray-100 border-gray-200'
+        }`}
+      >
         <button
           onClick={() => setMode('PHANTOM')}
           className={`px-3 py-1.5 rounded-lg transition-all ${
             mode === 'PHANTOM'
-              ? 'bg-white/20 text-blue-400 font-bold'
-              : 'text-gray-400 hover:text-white'
+              ? isDark
+                ? 'bg-white/20 text-blue-400 font-bold'
+                : 'bg-white text-blue-600 shadow-sm font-bold'
+              : isDark
+              ? 'text-gray-400 hover:text-white'
+              : 'text-gray-500 hover:text-gray-900'
           }`}
         >
           PHANTOM
@@ -45,8 +63,12 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setMode('HINOTORI')}
           className={`px-3 py-1.5 rounded-lg transition-all ${
             mode === 'HINOTORI'
-              ? 'bg-white/20 text-orange-400 font-bold'
-              : 'text-gray-400 hover:text-white'
+              ? isDark
+                ? 'bg-white/20 text-orange-400 font-bold'
+                : 'bg-white text-orange-600 shadow-sm font-bold'
+              : isDark
+              ? 'text-gray-400 hover:text-white'
+              : 'text-gray-500 hover:text-gray-900'
           }`}
         >
           HINOTORI
@@ -57,7 +79,11 @@ export const Header: React.FC<HeaderProps> = ({
         {/* テーマ切替 */}
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className="p-2 text-xs bg-white/10 hover:bg-white/20 text-white rounded-xl transition border border-white/10"
+          className={`p-2 text-xs rounded-xl transition border ${
+            isDark
+              ? 'bg-white/10 hover:bg-white/20 text-white border-white/10'
+              : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-200'
+          }`}
           title="テーマ切替"
         >
           {theme === 'light' ? '☀️ Light' : '🌙 Dark'}
@@ -67,7 +93,11 @@ export const Header: React.FC<HeaderProps> = ({
         {pubkey ? (
           <button
             onClick={onOpenSettings}
-            className="flex items-center gap-2 p-1 bg-white/10 hover:bg-white/20 rounded-xl transition border border-white/10"
+            className={`flex items-center gap-2 p-1 rounded-xl transition border ${
+              isDark
+                ? 'bg-white/10 hover:bg-white/20 border-white/10'
+                : 'bg-gray-100 hover:bg-gray-200 border-gray-200'
+            }`}
             title="設定"
           >
             {userProfile?.picture ? (
