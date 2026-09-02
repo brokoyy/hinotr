@@ -21,19 +21,39 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       setLoading(true);
       try {
         console.log('フォローリスト取得開始:', pubkey);
+
+        // 拡張機能からリレー一覧を取得できる場合は追加
+        let customRelays = [...DEFAULT_RELAYS];
+        const nostrExt = window.nostr as any;
+        if (nostrExt?.getRelays) {
+          try {
+            const userRelays = await nostrExt.getRelays();
+            const relayUrls = Object.keys(userRelays);
+            if (relayUrls.length > 0) {
+              customRelays = Array.from(new Set([...customRelays, ...relayUrls]));
+            }
+          } catch (e) {
+            console.warn('拡張機能からのリレー取得失敗:', e);
+          }
+        }
+
         const queryFilter: Filter = {
           kinds: [3],
           authors: [pubkey],
           limit: 1,
         };
-        const events = await pool.querySync(DEFAULT_RELAYS, [queryFilter] as any);
+
+        const events = await pool.querySync(customRelays, [queryFilter] as any);
 
         if (isMounted) {
           if (events && events.length > 0) {
-            const followPubkeys = events[0].tags
+            // 最新のKind 3を採用
+            const latestEvent = events.sort((a, b) => b.created_at - a.created_at)[0];
+            const followPubkeys = latestEvent.tags
               .filter((tag: string[]) => tag[0] === 'p')
               .map((tag: string[]) => tag[1]);
-            console.log('フォロー数:', followPubkeys.length);
+
+            console.log('フォロー数取得成功:', followPubkeys.length);
             setFollows([...followPubkeys, pubkey]);
           } else {
             console.log('フォローイベントが見つかりません。自分のみセット');
@@ -77,7 +97,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
 
     if (mode === 'PHANTOM') {
-      filter.since = now - 600; // 10分前
+      filter.since = now - 600; // 直近10分
       filter.limit = 100;
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
