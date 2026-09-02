@@ -1,13 +1,57 @@
 import { useState, useEffect } from 'react';
 import type { NostrEvent, AppMode, TimelinePost } from '../types/nostr';
-import { pool, DEFAULT_RELAYS } from '../lib/nostr';
+import { pool, DEFAULT_RELAYS, parseNip65Relays } from '../lib/nostr';
 
 export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   const [posts, setPosts] = useState<TimelinePost[]>([]);
   const [follows, setFollows] = useState<string[]>([]);
+  const [relays, setRelays] = useState<string[]>(DEFAULT_RELAYS);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // 1. pubkey に基づいてフォローリストを取得（未ログイン時は空配列）
+  // 1. NIP-65 (Kind 10002) リレーリストの取得
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!pubkey) {
+      setRelays(DEFAULT_RELAYS);
+      return;
+    }
+
+    const fetchUserRelays = async () => {
+      try {
+        const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://purplepag.es']));
+        const events = await pool.querySync(searchTarget, {
+          kinds: [10002],
+          authors: [pubkey],
+          limit: 1,
+        });
+
+        if (isMounted && events.length > 0) {
+          const userRelays = parseNip65Relays(events[0]);
+          if (userRelays.length > 0) {
+            console.log('NIP-65リレー設定を適用:', userRelays);
+            setRelays(userRelays);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('NIP-65の取得失敗:', e);
+      }
+
+      if (isMounted) {
+        console.log('NIP-65未設定または失敗のためデフォルトリレーを使用');
+        setRelays(DEFAULT_RELAYS);
+      }
+    };
+
+    fetchUserRelays();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [pubkey]);
+
+  // 2. pubkey に基づいてフォローリストを取得 (Kind 3)
   useEffect(() => {
     let isMounted = true;
 
@@ -19,7 +63,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const fetchFollows = async () => {
       setLoading(true);
       try {
-        const events = await pool.querySync(DEFAULT_RELAYS, {
+        const targetRelays = Array.from(new Set([...relays, 'wss://purplepag.es']));
+        const events = await pool.querySync(targetRelays, {
           kinds: [3],
           authors: [pubkey],
           limit: 1,
@@ -46,9 +91,9 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => {
       isMounted = false;
     };
-  }, [pubkey]);
+  }, [pubkey, relays]);
 
-  // 2. タイムラインの取得とリアルタイム購読
+  // 3. タイムラインの取得とリアルタイム購読
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
@@ -62,7 +107,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         kinds: [1],
         limit: 50,
       };
-      // フォローリストがある場合は対象を絞る
       if (follows.length > 0) {
         filter.authors = follows;
       }
@@ -84,7 +128,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     const fetchPosts = async () => {
       try {
-        const fetchedEvents = (await pool.querySync(DEFAULT_RELAYS, filter)) as NostrEvent[];
+        const fetchedEvents = (await pool.querySync(relays, filter)) as NostrEvent[];
         if (isMounted) {
           const sorted = fetchedEvents.sort((a, b) => b.created_at - a.created_at);
           setPosts(sorted);
@@ -99,7 +143,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     fetchPosts();
 
     if (mode === 'PHANTOM') {
-      const sub = pool.subscribeMany(DEFAULT_RELAYS, filter, {
+      const sub = pool.subscribeMany(relays, filter, {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
           setPosts((prev) => {
@@ -114,9 +158,9 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         sub.close();
       };
     }
-  }, [follows, mode, pubkey]);
+  }, [follows, mode, pubkey, relays]);
 
-  // 3. PHANTOMモードでのフェードアウトタイマー処理
+  // 4. PHANTOMモードでのフェードアウトタイマー処理
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 
@@ -136,5 +180,5 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => clearInterval(interval);
   }, [mode]);
 
-  return { posts, loading };
+  return { posts, loading, relays };
 }

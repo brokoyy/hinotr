@@ -5,6 +5,7 @@ import { useNostrTimeline } from './hooks/useNostrTimeline';
 import { Header } from './components/Header';
 import { PostCard } from './components/PostCard';
 import { PostForm } from './components/PostForm';
+import { SettingsModal } from './components/SettingsModal';
 
 const STORAGE_KEY_PUBKEY = 'hinotr_pubkey';
 
@@ -13,6 +14,7 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>('light');
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // 画面ロード時に localStorage から pubkey を復元
   useEffect(() => {
@@ -23,7 +25,8 @@ export default function App() {
     }
   }, []);
 
-  const { posts, loading } = useNostrTimeline(pubkey, mode);
+  // NIP-65 対応の動的リレーリストも受け取る
+  const { posts, loading, relays } = useNostrTimeline(pubkey, mode);
 
   // ログイン処理
   const handleLogin = async () => {
@@ -34,7 +37,7 @@ export default function App() {
     }
   };
 
-  // ログアウト処理（「解」ボタン押下時）
+  // ログアウト処理
   const handleLogout = () => {
     localStorage.removeItem(STORAGE_KEY_PUBKEY);
     setPubkey(null);
@@ -61,7 +64,7 @@ export default function App() {
           setTheme={setTheme}
           pubkey={pubkey}
           onLogin={handleLogin}
-          onLogout={handleLogout}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         <main className="flex-1">
@@ -97,6 +100,14 @@ export default function App() {
         <PostForm
           isOpen={isPostFormOpen}
           onClose={() => setIsPostFormOpen(false)}
+        />
+
+        {/* 設定モーダル（接続中リレーの確認＆ログアウト） */}
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          onLogout={handleLogout}
+          relays={relays}
         />
       </div>
     </div>

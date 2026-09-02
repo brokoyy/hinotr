@@ -1,13 +1,13 @@
 import React from 'react';
-import { DEFAULT_RELAYS } from '../lib/nostr';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogout: () => void;
+  relays: string[];
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onLogout }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onLogout, relays }) => {
   if (!isOpen) return null;
 
   return (
@@ -23,7 +23,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
         <div className="space-y-3">
           <h3 className="font-semibold text-sm text-gray-500 dark:text-gray-400">接続中リレー</h3>
           <div className="bg-gray-100 dark:bg-gray-700/50 p-3 rounded-xl space-y-2">
-            {DEFAULT_RELAYS.map((relay) => (
+            {relays.map((relay) => (
               <div key={relay} className="text-xs font-mono text-gray-700 dark:text-gray-300 truncate">
                 • {relay}
               </div>
