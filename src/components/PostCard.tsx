@@ -27,6 +27,12 @@ const IMAGE_REGEX = /(https?:\/\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?
 const VIDEO_REGEX = /(https?:\/\/[^\s]+?\.(?:mp4|webm|mov)(?:\?[^\s]*)?)/gi;
 const GENERAL_URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 
+// tags から client タグを抽出するヘルパー
+const getClientName = (tags: string[][]) => {
+  const clientTag = tags?.find((tag) => tag[0] === 'client');
+  return clientTag ? clientTag[1] : null;
+};
+
 function LinkCard({ url }: { url: string }) {
   const [ogp, setOgp] = useState<OgpData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,6 +156,7 @@ export function PostCard({ post, mode }: PostCardProps) {
         tags: [
           ['e', post.id],
           ['p', post.pubkey],
+          ['client', 'hinotr'], // リアクションにも一応入れておくと親切
         ],
         content: randomContent,
       };
@@ -173,6 +180,7 @@ export function PostCard({ post, mode }: PostCardProps) {
         tags: [
           ['e', post.id, '', 'mention'],
           ['p', post.pubkey],
+          ['client', 'hinotr'],
         ],
         content: JSON.stringify(post),
       };
@@ -195,6 +203,7 @@ export function PostCard({ post, mode }: PostCardProps) {
         tags: [
           ['e', post.id, '', 'reply'],
           ['p', post.pubkey],
+          ['client', 'hinotr'], // ★ ここで via hinotr タグを付与！
         ],
         content: replyText,
       };
@@ -310,25 +319,35 @@ export function PostCard({ post, mode }: PostCardProps) {
           {renderContent(post.content)}
 
           {mode === 'PHANTOM' && (
-            <div className="flex items-center gap-6 mt-3 text-xs opacity-70">
-              <button
-                onClick={() => setShowReplyBox(!showReplyBox)}
-                className="hover:text-blue-500 flex items-center gap-1"
-              >
-                💬 <span>返信</span>
-              </button>
-              <button
-                onClick={handleRepost}
-                className="hover:text-green-500 flex items-center gap-1"
-              >
-                🔁 <span>リポスト</span>
-              </button>
-              <button
-                onClick={handleRandomReaction}
-                className="hover:text-red-500 flex items-center gap-1"
-              >
-                {myReaction ? myReaction : '♡'}
-              </button>
+            <div className="flex items-center justify-between mt-3 text-xs opacity-70">
+              {/* 左側：各種アクションボタン */}
+              <div className="flex items-center gap-6">
+                <button
+                  onClick={() => setShowReplyBox(!showReplyBox)}
+                  className="hover:text-blue-500 flex items-center gap-1"
+                >
+                  💬 <span>返信</span>
+                </button>
+                <button
+                  onClick={handleRepost}
+                  className="hover:text-green-500 flex items-center gap-1"
+                >
+                  🔁 <span>リポスト</span>
+                </button>
+                <button
+                  onClick={handleRandomReaction}
+                  className="hover:text-red-500 flex items-center gap-1"
+                >
+                  {myReaction ? myReaction : '♡'}
+                </button>
+              </div>
+
+              {/* 右側：via クライアント名（右寄せ） */}
+              {getClientName(post.tags) && (
+                <span className="opacity-60 text-[11px]">
+                  via <span className="font-semibold">{getClientName(post.tags)}</span>
+                </span>
+              )}
             </div>
           )}
 
