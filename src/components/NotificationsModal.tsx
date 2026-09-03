@@ -44,6 +44,29 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
     }
   };
 
+  // リポストのJSONから元のコンテンツを安全に抽出するヘルパー
+  const parseNotificationContent = (item: NotificationItem) => {
+    if (item.kind === 6) {
+      try {
+        const parsed = JSON.parse(item.content);
+        if (parsed && typeof parsed.content === 'string') {
+          return {
+            type: 'repost',
+            text: parsed.content,
+            note: 'あなたの投稿をリポストしました',
+          };
+        }
+      } catch {
+        // パースに失敗した場合はそのまま表示
+      }
+    }
+    return {
+      type: 'normal',
+      text: item.content,
+      note: null,
+    };
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div
@@ -85,6 +108,8 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
           {notifications.map((item) => {
             const badge = getNotificationBadge(item.kind);
+            const parsed = parseNotificationContent(item);
+
             return (
               <div
                 key={item.id}
@@ -103,9 +128,18 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                     {formatPubkey(item.pubkey)}
                   </span>
                 </div>
+
+                {/* リポストの場合は補足を表示 */}
+                {parsed.note && (
+                  <div className="text-[11px] opacity-60 mb-1 font-medium">
+                    {parsed.note}
+                  </div>
+                )}
+
                 <p className="text-sm whitespace-pre-wrap break-words opacity-90 line-clamp-3">
-                  {item.content || (item.kind === 7 ? 'リアクションしました' : '(コンテンツなし)')}
+                  {parsed.text || (item.kind === 7 ? 'リアクションしました' : '(コンテンツなし)')}
                 </p>
+
                 <div className="text-[10px] opacity-40 text-right mt-2 font-mono">
                   {new Date(item.created_at * 1000).toLocaleString()}
                 </div>
