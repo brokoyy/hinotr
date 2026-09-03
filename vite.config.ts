@@ -7,4 +7,5 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  publicDir: 'static', // これでstatic内のファイルがビルドに含まれる
 })
