@@ -1,4 +1,5 @@
 import React from 'react';
+import { nip19 } from 'nostr-tools'; // インポート元はプロジェクトの構成に合わせて調整してください
 import type { AppMode, Theme } from '../types/nostr';
 import type { UserProfile } from '../hooks/useNostrTimeline';
 
@@ -24,6 +25,17 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSettings,
 }) => {
   const isDark = theme === 'dark';
+
+  // HEX公開鍵を npub1xxxx...xxxx 形式にフォーマットする関数
+  const formatNpub = (hexKey: string) => {
+    try {
+      const npub = nip19.npubEncode(hexKey);
+      return `@${npub.slice(0, 12)}...${npub.slice(-8)}`;
+    } catch (e) {
+      // 万が一変換に失敗した場合は元のHEXで安全にフォールバック
+      return `@${hexKey.slice(0, 8)}...${hexKey.slice(-8)}`;
+    }
+  };
 
   return (
     <header
@@ -75,7 +87,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
         {/* テーマ切替 */}
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
@@ -93,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
         {pubkey ? (
           <button
             onClick={onOpenSettings}
-            className={`flex items-center gap-2 p-1 rounded-xl transition border ${
+            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition border ${
               isDark
                 ? 'bg-white/10 hover:bg-white/20 border-white/10'
                 : 'bg-gray-100 hover:bg-gray-200 border-gray-200'
@@ -107,8 +119,12 @@ export const Header: React.FC<HeaderProps> = ({
                 className="w-7 h-7 rounded-full object-cover"
               />
             ) : (
-              <span className="px-1.5">⚙️</span>
+              <span className="text-sm">⚙️</span>
             )}
+            {/* npubの省略表示 */}
+            <span className="text-xs font-mono opacity-80 hidden sm:inline">
+              {formatNpub(pubkey)}
+            </span>
           </button>
         ) : (
           <button

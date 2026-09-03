@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { nip19 } from 'nostr-tools';
 import type { AppMode, TimelinePost } from '../types/nostr';
 import { pool, DEFAULT_RELAYS } from '../lib/nostr';
 
@@ -218,6 +219,16 @@ export function PostCard({ post, mode }: PostCardProps) {
     return `${year}/${month}/${day} ${hours}:${minutes}`;
   };
 
+  // HEX公開鍵を @npub1xxxx...xxxx 形式にフォーマットする関数
+  const formatNpub = (hexKey: string) => {
+    try {
+      const npub = nip19.npubEncode(hexKey);
+      return `@${npub.slice(0, 12)}...${npub.slice(-8)}`;
+    } catch (e) {
+      return `@${hexKey.slice(0, 8)}...${hexKey.slice(-8)}`;
+    }
+  };
+
   const renderContent = (content: string) => {
     const images: string[] = (content.match(IMAGE_REGEX) || []) as string[];
     const videos: string[] = (content.match(VIDEO_REGEX) || []) as string[];
@@ -288,7 +299,7 @@ export function PostCard({ post, mode }: PostCardProps) {
             <div className="flex items-center gap-2 truncate">
               <span className="font-bold truncate">{displayName}</span>
               <span className="text-xs opacity-50 truncate">
-                @{post.pubkey.slice(0, 8)}
+                {formatNpub(post.pubkey)}
               </span>
             </div>
             <span className="text-xs opacity-50 flex-shrink-0">
