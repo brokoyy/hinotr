@@ -110,15 +110,17 @@ export default function App() {
           ))}
         </main>
 
-        {/* 投稿ボタン：スマホでは右下、PCではタイムラインのすぐ右外側の右下に固定(fixed) */}
+        {/* 投稿ボタン：羽ペンアイコン */}
         {mode === 'PHANTOM' && pubkey && (
           <button
             onClick={() => setIsPostFormOpen(true)}
             className="fixed bottom-6 right-6 lg:left-[calc(50%+30rem)] lg:bottom-6 w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 active:scale-95 hover:scale-105 z-40"
             title="投稿する"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="m20 4-4 4m-4 12v-3.586a1 1 0 0 1 .293-.707l5.414-5.414a1 1 0 0 0 0-1.414l-3.586-3.586a1 1 0 0 0-1.414 0l-5.414 5.414A1 1 0 0 0 6 11.414V16H4v2h2v2h2v-2h2.586a1 1 0 0 0 .707-.293l1.414-1.414" />
+            <svg className="w-7 h-7 fill-current" viewBox="0 0 512 512">
+              <path d="M447.1 64.9c-29.2-29.2-76.6-29.2-105.8 0L77.7 328.5c-7.5 7.5-12.8 16.8-15.1 27L41.3 454.4c-3.1 13.7 9 25.8 22.7 22.7l98.9-21.3c10.2-2.2 19.5-7.6 27-15.1L447.2 170.7c29.2-29.2 29.2-76.6 0-105.8zM147.2 419.2l-58.4 12.6 12.6-58.4L278 194.2l45.8 45.8-176.6 179.2zM336.5 208.5l-45.8-45.8 43.1-43.1c14.6-14.6 38.3-14.6 52.9 0l31.5 31.5c14.6 14.6 14.6 38.3 0 52.9l-81.7 44.5z" />
+              {/* 中央のスリット（白い抜き線） */}
+              <path fill="#2563EB" d="M192.2 301.2l128-128c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0l-128 128c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0z" />
             </svg>
           </button>
         )}
