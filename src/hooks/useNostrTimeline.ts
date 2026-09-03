@@ -128,7 +128,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
   }, [pubkey, relays]);
 
-  // 4. タイムラインの取得（フォローリストが確定するまでクエリを走らせない）
+  // 4. タイムラインの取得（フォローリストの確定を待ち、PHANTOM時は最初から10分以内に絞る）
   useEffect(() => {
     let isMounted = true;
 
@@ -149,7 +149,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     let filter: any = {};
 
     if (mode === 'PHANTOM') {
-      filter = { kinds: [1], limit: 50, authors: follows };
+      const tenMinutesAgo = now - 600;
+      filter = { kinds: [1], since: tenMinutesAgo, limit: 50, authors: follows };
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
       const SIX_HOURS = 6 * 60 * 60;
@@ -168,7 +169,14 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       try {
         const fetchedEvents = (await pool.querySync(relays, filter)) as NostrEvent[];
         if (isMounted) {
-          const sorted = fetchedEvents.sort((a, b) => b.created_at - a.created_at);
+          const currentTime = Math.floor(Date.now() / 1000);
+          
+          // PHANTOMモード時は取得データ側でも念のため10分以内のものだけに厳密に絞り込む
+          const processedEvents = mode === 'PHANTOM'
+            ? fetchedEvents.filter((post) => currentTime - post.created_at < 600)
+            : fetchedEvents;
+
+          const sorted = processedEvents.sort((a, b) => b.created_at - a.created_at);
           setPosts(sorted);
         }
       } catch (e) {
@@ -184,6 +192,9 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       const sub = pool.subscribeMany(relays, filter, {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
+          const currentTime = Math.floor(Date.now() / 1000);
+          if (currentTime - event.created_at >= 600) return; // 10分以上古いものはリアルタイム追加しない
+
           setPosts((prev) => {
             if (prev.some((p) => p.id === event.id)) return prev;
             return [event, ...prev].sort((a, b) => b.created_at - a.created_at);
