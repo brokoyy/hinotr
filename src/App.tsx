@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { AppMode, Theme } from './types/nostr';
 import { loginWithNip07 } from './lib/nostr';
 import { useNostrTimeline } from './hooks/useNostrTimeline';
+import { useNostrNotifications } from './hooks/useNostrNotifications'; // ★ 追加
 import { Header } from './components/Header';
 import { PostCard } from './components/PostCard';
 import { PostForm } from './components/PostForm';
@@ -27,7 +28,7 @@ export default function App() {
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false); // ★ 追加
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   useEffect(() => {
     const savedKey = localStorage.getItem(STORAGE_KEY_PUBKEY);
@@ -43,6 +44,7 @@ export default function App() {
   }, [theme]);
 
   const { posts, loading, relays, userProfile } = useNostrTimeline(pubkey, mode);
+  const { notifications, loading: notificationsLoading } = useNostrNotifications(pubkey); // ★ 通知フックの呼び出し
 
   const handleLogin = async () => {
     const key = await loginWithNip07();
@@ -80,7 +82,7 @@ export default function App() {
           userProfile={userProfile}
           onLogin={handleLogin}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenNotifications={() => setIsNotificationsOpen(true)} // ★ 接続
+          onOpenNotifications={() => setIsNotificationsOpen(true)}
         />
 
         <main className="flex-1">
@@ -135,11 +137,13 @@ export default function App() {
           setTheme={setTheme}
         />
 
-        {/* ★ 通知モーダル */}
+        {/* 通知モーダル */}
         <NotificationsModal
           isOpen={isNotificationsOpen}
           onClose={() => setIsNotificationsOpen(false)}
           theme={theme}
+          notifications={notifications}
+          loading={notificationsLoading}
         />
       </div>
     </div>
