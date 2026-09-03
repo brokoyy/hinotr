@@ -103,7 +103,16 @@ export function PostCard({ post, mode }: PostCardProps) {
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [myReaction, setMyReaction] = useState<string | null>(null);
+
+  // 更新時に localStorage からリアクション状態を復元する
+  const [myReaction, setMyReaction] = useState<string | null>(() => {
+    try {
+      const saved = localStorage.getItem(`hinotr_reaction_${post.id}`);
+      return saved !== null ? saved : null;
+    } catch {
+      return null;
+    }
+  });
 
   // プロフィール取得
   useEffect(() => {
@@ -141,37 +150,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     };
   }, [post.pubkey]);
 
-  // ★ 自分がこの投稿に付けたリアクション (Kind 7) をリレーから探して復元する
-  useEffect(() => {
-    let isMounted = true;
-    const checkMyReaction = async () => {
-      if (!window.nostr) return;
-      try {
-        // ログイン中の自分のpubkeyを取得 (NIP-07)
-        const myPubkey = await window.nostr.getPublicKey();
-        if (!myPubkey) return;
-
-        // リレーから「自分が書いた、この投稿に対するKind 7イベント」を取得
-        const reactionEvent = await pool.get(DEFAULT_RELAYS, {
-          kinds: [7],
-          authors: [myPubkey],
-          '#e': [post.id],
-        });
-
-        if (reactionEvent && isMounted) {
-          setMyReaction(reactionEvent.content);
-        }
-      } catch (e) {
-        console.error('リアクション復元失敗:', e);
-      }
-    };
-
-    checkMyReaction();
-    return () => {
-      isMounted = false;
-    };
-  }, [post.id]);
-
   // リアクション (Kind 7)
   const handleRandomReaction = async () => {
     if (mode === 'HINOTORI' || !window.nostr) return;
@@ -180,6 +158,9 @@ export function PostCard({ post, mode }: PostCardProps) {
     const randomContent = reactions[Math.floor(Math.random() * reactions.length)];
 
     setMyReaction(randomContent);
+    try {
+      localStorage.setItem(`hinotr_reaction_${post.id}`, randomContent);
+    } catch {}
 
     try {
       const template = {
@@ -196,7 +177,11 @@ export function PostCard({ post, mode }: PostCardProps) {
       await pool.publish(DEFAULT_RELAYS, signedEvent);
     } catch (e) {
       console.error('リアクション失敗:', e);
+      // 失敗時は戻す
       setMyReaction(null);
+      try {
+        localStorage.removeItem(`hinotr_reaction_${post.id}`);
+      } catch {}
     }
   };
 
