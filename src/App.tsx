@@ -13,7 +13,6 @@ const STORAGE_KEY_THEME = 'hinotr_theme';
 export default function App() {
   const [mode, setMode] = useState<AppMode>('PHANTOM');
   
-  // 1. ローカルストレージからテーマの初期値を復元（なければ 'light'）
   const [theme, setTheme] = useState<Theme>(() => {
     try {
       const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
@@ -35,7 +34,6 @@ export default function App() {
     }
   }, []);
 
-  // 2. テーマが変更されたらローカルストレージに保存する
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_THEME, theme);
@@ -115,7 +113,7 @@ export default function App() {
         {mode === 'PHANTOM' && pubkey && (
           <button
             onClick={() => setIsPostFormOpen(true)}
-            className="fixed bottom-6 right-6 lg:absolute lg:bottom-6 lg:-right-20 w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xl flex items-center justify-center text-2xl transition-all duration-200 active:scale-95 hover:scale-105 z-40"
+            className="fixed bottom-6 right-6 lg:absolute lg:top-6 lg:right-[-70px] w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xl flex items-center justify-center text-2xl transition-all duration-200 active:scale-95 hover:scale-105 z-40"
             title="投稿する"
           >
             🖋
