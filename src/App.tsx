@@ -78,6 +78,10 @@ export default function App() {
           userProfile={userProfile}
           onLogin={handleLogin}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenNotifications={() => {
+            // TODO: 通知モーダルを開く処理をここに繋げます
+            alert('通知機能はまもなく実装します！');
+          }}
         />
 
         <main className="flex-1">
@@ -113,7 +117,6 @@ export default function App() {
           >
             <svg className="w-7 h-7 fill-current" viewBox="0 0 512 512">
               <path d="M447.1 64.9c-29.2-29.2-76.6-29.2-105.8 0L77.7 328.5c-7.5 7.5-12.8 16.8-15.1 27L41.3 454.4c-3.1 13.7 9 25.8 22.7 22.7l98.9-21.3c10.2-2.2 19.5-7.6 27-15.1L447.2 170.7c29.2-29.2 29.2-76.6 0-105.8zM147.2 419.2l-58.4 12.6 12.6-58.4L278 194.2l45.8 45.8-176.6 179.2zM336.5 208.5l-45.8-45.8 43.1-43.1c14.6-14.6 38.3-14.6 52.9 0l31.5 31.5c14.6 14.6 14.6 38.3 0 52.9l-81.7 44.5z" />
-              {/* 中央のスリット（白い抜き線） */}
               <path fill="#2563EB" d="M192.2 301.2l128-128c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0l-128 128c-6.2 6.2-6.2 16.4 0 22.6s16.4 6.2 22.6 0z" />
             </svg>
           </button>
@@ -129,6 +132,8 @@ export default function App() {
           onClose={() => setIsSettingsOpen(false)}
           onLogout={handleLogout}
           relays={relays}
+          theme={theme}
+          setTheme={setTheme}
         />
       </div>
     </div>
