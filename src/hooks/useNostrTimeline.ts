@@ -128,13 +128,17 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
   }, [pubkey, relays]);
 
-  // 4. タイムラインの取得
+  // 4. タイムラインの取得（フォローリストが確定するまでクエリを走らせない）
   useEffect(() => {
     let isMounted = true;
 
-    if (!pubkey) {
-      setPosts([]);
-      setLoading(false);
+    if (!pubkey || follows.length === 0) {
+      if (pubkey && follows.length === 0) {
+        setLoading(true);
+      } else {
+        setPosts([]);
+        setLoading(false);
+      }
       return;
     }
 
@@ -145,8 +149,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     let filter: any = {};
 
     if (mode === 'PHANTOM') {
-      filter = { kinds: [1], limit: 50 };
-      if (follows.length > 0) filter.authors = follows;
+      filter = { kinds: [1], limit: 50, authors: follows };
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
       const SIX_HOURS = 6 * 60 * 60;
@@ -157,8 +160,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         since: oneYearAgoNow - SIX_HOURS,
         until: oneYearAgoNow,
         limit: 200,
+        authors: follows,
       };
-      if (follows.length > 0) filter.authors = follows;
     }
 
     const fetchPosts = async () => {
