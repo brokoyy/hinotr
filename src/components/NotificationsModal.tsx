@@ -34,7 +34,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   const getNotificationBadge = (kind: number) => {
     switch (kind) {
       case 1:
-        return { icon: '💬', label: 'リプライ / メンション', color: 'text-blue-500 bg-blue-500/10' };
+        return { icon: '💬', label: 'リプライ', color: 'text-blue-500 bg-blue-500/10' };
       case 6:
         return { icon: '🔄', label: 'リポスト', color: 'text-green-500 bg-green-500/10' };
       case 7:
@@ -44,7 +44,6 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
     }
   };
 
-  // リポストのJSONから元のコンテンツを安全に抽出するヘルパー
   const parseNotificationContent = (item: NotificationItem) => {
     if (item.kind === 6) {
       try {
@@ -105,6 +104,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
           {notifications.map((item) => {
             const badge = getNotificationBadge(item.kind);
             const parsed = parseNotificationContent(item);
+            const profile = item.userProfile;
 
             return (
               <div
@@ -115,18 +115,31 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                     : 'bg-gray-50 border-gray-200 hover:bg-gray-100/80'
                 }`}
               >
-                {/* ヘッダー情報（バッジ ＆ 送信者） */}
+                {/* ヘッダー情報（バッジ ＆ 送信者アイコン・名前） */}
                 <div className="flex items-center justify-between text-xs">
                   <span className={`px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${badge.color}`}>
                     <span>{badge.icon}</span>
                     <span>{badge.label}</span>
                   </span>
-                  <span className="opacity-60 font-mono text-[10px]">
-                    by {formatPubkey(item.pubkey)}
-                  </span>
+
+                  {/* 送信者アイコン ＆ 名前 */}
+                  <div className="flex items-center gap-1.5">
+                    {profile?.picture ? (
+                      <img
+                        src={profile.picture}
+                        alt="Avatar"
+                        className="w-5 h-5 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-slate-400 animate-pulse" />
+                    )}
+                    <span className="font-medium opacity-90 truncate max-w-[120px]">
+                      {profile?.display_name || profile?.name || formatPubkey(item.pubkey)}
+                    </span>
+                  </div>
                 </div>
 
-                {/* メインの通知コンテンツ（リアクションの絵文字やリプライ本文など） */}
+                {/* メインの通知コンテンツ */}
                 <div>
                   {parsed.note && (
                     <div className="text-[11px] opacity-60 mb-1 font-medium">
