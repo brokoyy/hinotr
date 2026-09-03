@@ -8,10 +8,22 @@ import { PostForm } from './components/PostForm';
 import { SettingsModal } from './components/SettingsModal';
 
 const STORAGE_KEY_PUBKEY = 'hinotr_pubkey';
+const STORAGE_KEY_THEME = 'hinotr_theme';
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>('PHANTOM');
-  const [theme, setTheme] = useState<Theme>('light');
+  
+  // 1. ローカルストレージからテーマの初期値を復元（なければ 'light'）
+  const [theme, setTheme] = useState<Theme>(() => {
+    try {
+      const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
+      if (savedTheme === 'light' || savedTheme === 'dark') {
+        return savedTheme;
+      }
+    } catch (e) {}
+    return 'light';
+  });
+
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -22,6 +34,13 @@ export default function App() {
       setPubkey(savedKey);
     }
   }, []);
+
+  // 2. テーマが変更されたらローカルストレージに保存する
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY_THEME, theme);
+    } catch (e) {}
+  }, [theme]);
 
   const { posts, loading, relays, userProfile } = useNostrTimeline(pubkey, mode);
 
