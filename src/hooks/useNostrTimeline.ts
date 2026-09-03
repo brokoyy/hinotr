@@ -7,14 +7,28 @@ export interface UserProfile {
   name?: string;
 }
 
-// リレー用のストレージキー
+// ストレージキー
 const STORAGE_KEY_RELAYS = 'hinotr_relays';
+const STORAGE_KEY_POSTS = 'hinotr_cached_posts';
 
 export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
-  const [posts, setPosts] = useState<TimelinePost[]>([]);
+  // 1. 初回からlocalStorageのキャッシュ投稿を初期値にする（ゼロちらつき・即時表示）
+  const [posts, setPosts] = useState<TimelinePost[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_POSTS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      // 読み込み失敗時は空
+    }
+    return [];
+  });
+
   const [follows, setFollows] = useState<string[]>([]);
   
-  // 1. 初回からlocalStorageのリレー（またはデフォルト）を初期値にする
+  // リレーの初期値
   const [relays, setRelays] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_RELAYS);
@@ -22,9 +36,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    } catch (e) {
-      // 読み込み失敗時はフォールバック
-    }
+    } catch (e) {}
     return DEFAULT_RELAYS;
   });
 
@@ -44,7 +56,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       try {
         const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://purplepag.es']));
         
-        // リレーリスト取得 (Kind 10002)
         const relayEvents = await pool.querySync(searchTarget, {
           kinds: [10002],
           authors: [pubkey],
@@ -55,12 +66,10 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           const userRelays = parseNip65Relays(relayEvents[0]);
           if (userRelays.length > 0) {
             setRelays(userRelays);
-            // 次回のためにローカルストレージに保存
             localStorage.setItem(STORAGE_KEY_RELAYS, JSON.stringify(userRelays));
           }
         }
 
-        // プロフィール取得 (Kind 0)
         const profileEvents = await pool.querySync(searchTarget, {
           kinds: [0],
           authors: [pubkey],
@@ -96,7 +105,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
 
     const fetchFollows = async () => {
-      setLoading(true);
       try {
         const targetRelays = Array.from(new Set([...relays, 'wss://purplepag.es']));
         const events = await pool.querySync(targetRelays, {
@@ -128,22 +136,13 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
   }, [pubkey, relays]);
 
-  // 4. タイムラインの取得（フォローリストの確定を待ち、PHANTOM時は最初から10分以内に絞る）
+  // 4. タイムラインの取得（キャッシュがあるためローディング表示を挟まず裏で更新）
   useEffect(() => {
     let isMounted = true;
 
     if (!pubkey || follows.length === 0) {
-      if (pubkey && follows.length === 0) {
-        setLoading(true);
-      } else {
-        setPosts([]);
-        setLoading(false);
-      }
       return;
     }
-
-    setLoading(true);
-    setPosts([]);
 
     const now = Math.floor(Date.now() / 1000);
     let filter: any = {};
@@ -171,13 +170,15 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         if (isMounted) {
           const currentTime = Math.floor(Date.now() / 1000);
           
-          // PHANTOMモード時は取得データ側でも念のため10分以内のものだけに厳密に絞り込む
           const processedEvents = mode === 'PHANTOM'
             ? fetchedEvents.filter((post) => currentTime - post.created_at < 600)
             : fetchedEvents;
 
           const sorted = processedEvents.sort((a, b) => b.created_at - a.created_at);
           setPosts(sorted);
+          
+          // 最新の取得結果でキャッシュを更新
+          localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sorted));
         }
       } catch (e) {
         console.error('投稿の取得失敗:', e);
@@ -193,11 +194,14 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
           const currentTime = Math.floor(Date.now() / 1000);
-          if (currentTime - event.created_at >= 600) return; // 10分以上古いものはリアルタイム追加しない
+          if (currentTime - event.created_at >= 600) return;
 
           setPosts((prev) => {
             if (prev.some((p) => p.id === event.id)) return prev;
-            return [event, ...prev].sort((a, b) => b.created_at - a.created_at);
+            const updated = [event, ...prev].sort((a, b) => b.created_at - a.created_at);
+            // リアルタイム追加時もキャッシュを更新
+            localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(updated));
+            return updated;
           });
         },
       });
@@ -216,14 +220,15 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const interval = setInterval(() => {
       const now = Math.floor(Date.now() / 1000);
 
-      setPosts((prevPosts) =>
-        prevPosts
+      setPosts((prevPosts) => {
+        const filtered = prevPosts
           .filter((post) => now - post.created_at < 600)
           .map((post) => ({
             ...post,
             isFading: now - post.created_at >= 540,
-          }))
-      );
+          }));
+        return filtered;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
