@@ -51,17 +51,13 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         const parsed = JSON.parse(item.content);
         if (parsed && typeof parsed.content === 'string') {
           return {
-            type: 'repost',
             text: parsed.content,
             note: 'あなたの投稿をリポストしました',
           };
         }
-      } catch {
-        // パースに失敗した場合はそのまま表示
-      }
+      } catch {}
     }
     return {
-      type: 'normal',
       text: item.content,
       note: null,
     };
@@ -113,34 +109,55 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
             return (
               <div
                 key={item.id}
-                className={`p-3.5 rounded-xl border transition ${
+                className={`p-3.5 rounded-xl border transition space-y-2.5 ${
                   isDark
                     ? 'bg-gray-700/40 border-gray-700 hover:bg-gray-700/70'
                     : 'bg-gray-50 border-gray-200 hover:bg-gray-100/80'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs mb-2">
+                {/* ヘッダー情報（バッジ ＆ 送信者） */}
+                <div className="flex items-center justify-between text-xs">
                   <span className={`px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${badge.color}`}>
                     <span>{badge.icon}</span>
                     <span>{badge.label}</span>
                   </span>
-                  <span className="opacity-50 font-mono text-[10px]">
-                    {formatPubkey(item.pubkey)}
+                  <span className="opacity-60 font-mono text-[10px]">
+                    by {formatPubkey(item.pubkey)}
                   </span>
                 </div>
 
-                {/* リポストの場合は補足を表示 */}
-                {parsed.note && (
-                  <div className="text-[11px] opacity-60 mb-1 font-medium">
-                    {parsed.note}
+                {/* メインの通知コンテンツ（リアクションの絵文字やリプライ本文など） */}
+                <div>
+                  {parsed.note && (
+                    <div className="text-[11px] opacity-60 mb-1 font-medium">
+                      {parsed.note}
+                    </div>
+                  )}
+                  <p className="text-sm whitespace-pre-wrap break-words opacity-90 font-medium">
+                    {parsed.text || (item.kind === 7 ? '👍 リアクションしました' : '(コンテンツなし)')}
+                  </p>
+                </div>
+
+                {/* 対象となった元の自分の投稿（引用風カード） */}
+                {item.targetEvent && (
+                  <div
+                    className={`mt-2 p-2.5 rounded-lg border text-xs space-y-1 ${
+                      isDark
+                        ? 'bg-black/30 border-white/10 text-gray-300'
+                        : 'bg-white border-gray-200 text-gray-700 shadow-2xs'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between opacity-50 text-[10px] font-mono">
+                      <span>対象の投稿</span>
+                      <span>{formatPubkey(item.targetEvent.pubkey)}</span>
+                    </div>
+                    <p className="line-clamp-2 opacity-90">
+                      {item.targetEvent.content}
+                    </p>
                   </div>
                 )}
 
-                <p className="text-sm whitespace-pre-wrap break-words opacity-90 line-clamp-3">
-                  {parsed.text || (item.kind === 7 ? 'リアクションしました' : '(コンテンツなし)')}
-                </p>
-
-                <div className="text-[10px] opacity-40 text-right mt-2 font-mono">
+                <div className="text-[10px] opacity-40 text-right pt-1 font-mono">
                   {new Date(item.created_at * 1000).toLocaleString()}
                 </div>
               </div>
