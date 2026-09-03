@@ -203,7 +203,7 @@ export function PostCard({ post, mode }: PostCardProps) {
         tags: [
           ['e', post.id, '', 'reply'],
           ['p', post.pubkey],
-          ['client', 'hinotr'], // ★ ここで via hinotr タグを付与！
+          ['client', 'hinotr'], //  via hinotr を付与
         ],
         content: replyText,
       };
