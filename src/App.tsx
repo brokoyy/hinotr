@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import type { AppMode, Theme } from './types/nostr';
 import { loginWithNip07 } from './lib/nostr';
 import { useNostrTimeline } from './hooks/useNostrTimeline';
-import { useNostrNotifications } from './hooks/useNostrNotifications'; // ★ 追加
+import { useNostrNotifications } from './hooks/useNostrNotifications';
 import { Header } from './components/Header';
 import { PostCard } from './components/PostCard';
 import { PostForm } from './components/PostForm';
@@ -11,6 +11,7 @@ import { NotificationsModal } from './components/NotificationsModal';
 
 const STORAGE_KEY_PUBKEY = 'hinotr_pubkey';
 const STORAGE_KEY_THEME = 'hinotr_theme';
+const STORAGE_KEY_LAST_READ = 'hinotr_last_read_time';
 
 export default function App() {
   const [mode, setMode] = useState<AppMode>('PHANTOM');
@@ -30,6 +31,16 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+  // 最後に通知を確認したタイムスタンプの管理
+  const [lastReadTime, setLastReadTime] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_LAST_READ);
+      return saved ? Number(saved) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   useEffect(() => {
     const savedKey = localStorage.getItem(STORAGE_KEY_PUBKEY);
     if (savedKey) {
@@ -44,7 +55,22 @@ export default function App() {
   }, [theme]);
 
   const { posts, loading, relays, userProfile } = useNostrTimeline(pubkey, mode);
-  const { notifications, loading: notificationsLoading } = useNostrNotifications(pubkey); // ★ 通知フックの呼び出し
+  const { notifications, loading: notificationsLoading } = useNostrNotifications(pubkey);
+
+  // 未読判定：最新の通知の created_at が lastReadTime よりも大きければ未読あり
+  const hasUnread = notifications.length > 0 && notifications[0].created_at > lastReadTime;
+
+  // 通知モーダルを開いたときの処理（既読にする）
+  const handleOpenNotifications = () => {
+    setIsNotificationsOpen(true);
+    if (notifications.length > 0) {
+      const latestTime = notifications[0].created_at;
+      setLastReadTime(latestTime);
+      try {
+        localStorage.setItem(STORAGE_KEY_LAST_READ, String(latestTime));
+      } catch {}
+    }
+  };
 
   const handleLogin = async () => {
     const key = await loginWithNip07();
@@ -82,7 +108,8 @@ export default function App() {
           userProfile={userProfile}
           onLogin={handleLogin}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenNotifications={() => setIsNotificationsOpen(true)}
+          onOpenNotifications={handleOpenNotifications}
+          hasUnread={hasUnread} // 未読フラグをヘッダーに渡す準備
         />
 
         <main className="flex-1">
@@ -137,7 +164,6 @@ export default function App() {
           setTheme={setTheme}
         />
 
-        {/* 通知モーダル */}
         <NotificationsModal
           isOpen={isNotificationsOpen}
           onClose={() => setIsNotificationsOpen(false)}
