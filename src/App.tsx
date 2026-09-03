@@ -114,10 +114,12 @@ export default function App() {
         {mode === 'PHANTOM' && pubkey && (
           <button
             onClick={() => setIsPostFormOpen(true)}
-            className="fixed bottom-6 right-6 lg:left-[calc(50%+30rem)] lg:bottom-6 w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xl flex items-center justify-center text-2xl transition-all duration-200 active:scale-95 hover:scale-105 z-40"
+            className="fixed bottom-6 right-6 lg:left-[calc(50%+30rem)] lg:bottom-6 w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-2xl flex items-center justify-center transition-all duration-200 active:scale-95 hover:scale-105 z-40"
             title="投稿する"
           >
-            🖋
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="m20 4-4 4m-4 12v-3.586a1 1 0 0 1 .293-.707l5.414-5.414a1 1 0 0 0 0-1.414l-3.586-3.586a1 1 0 0 0-1.414 0l-5.414 5.414A1 1 0 0 0 6 11.414V16H4v2h2v2h2v-2h2.586a1 1 0 0 0 .707-.293l1.414-1.414" />
+            </svg>
           </button>
         )}
 
