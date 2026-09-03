@@ -1,11 +1,7 @@
 import { useState, useEffect } from 'react';
-import { SimplePool, Event as NostrEvent } from 'nostr-tools';
-
-const DEFAULT_RELAYS = [
-  'wss://relay-jp.nostr.wirednet.jp',
-  'wss://relay.damus.io',
-  'wss://nos.lol',
-];
+import type { Event as NostrEvent, Filter } from 'nostr-tools';
+import { SimplePool } from 'nostr-tools';
+import { DEFAULT_RELAYS } from '../lib/nostr';
 
 export interface NotificationItem {
   id: string;
@@ -29,24 +25,21 @@ export function useNostrNotifications(pubkey: string | null) {
     const pool = new SimplePool();
     setLoading(true);
 
+    const filter: Filter = {
+      '#p': [pubkey],
+      kinds: [1, 6, 7],
+      limit: 50,
+    };
+
     const sub = pool.subscribeMany(
       DEFAULT_RELAYS,
-      [
-        {
-          '#p': [pubkey],
-          kinds: [1, 6, 7], // 1: リプライ/メンション, 6: リポスト, 7: リアクション
-          limit: 50,
-        },
-      ],
+      [filter],
       {
         onevent(event: NostrEvent) {
-          // 自分自身の投稿に対するアクションは通知から除外する場合
           if (event.pubkey === pubkey) return;
 
           setNotifications((prev) => {
-            // 重複チェック
             if (prev.some((n) => n.id === event.id)) return prev;
-            // 新しい順にソート
             const updated = [event, ...prev];
             return updated.sort((a, b) => b.created_at - a.created_at);
           });
