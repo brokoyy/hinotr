@@ -33,7 +33,7 @@ export function useNostrNotifications(pubkey: string | null) {
 
     const sub = pool.subscribeMany(
       DEFAULT_RELAYS,
-      [filter],
+      filter, // 配列ではなく単体の Filter オブジェクトとして渡す
       {
         onevent(event: NostrEvent) {
           if (event.pubkey === pubkey) return;
