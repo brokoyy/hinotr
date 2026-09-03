@@ -57,7 +57,7 @@ export default function App() {
 
   const themeClasses = {
     PHANTOM: {
-      light: 'bg-gradient-to-b from-white to-blue-400 text-slate-900',
+      light: 'bg-gradient-to-b from-white via-white/80 to-blue-400 text-slate-900',
       dark: 'bg-gradient-to-b from-black via-slate-950 to-blue-950 text-white',
     },
     HINOTORI: {
