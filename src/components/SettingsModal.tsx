@@ -1,13 +1,23 @@
 import React from 'react';
+import type { Theme } from '../types/nostr';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogout: () => void;
   relays: string[];
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, onLogout, relays }) => {
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  onClose,
+  onLogout,
+  relays,
+  theme,
+  setTheme,
+}) => {
   if (!isOpen) return null;
 
   return (
@@ -17,6 +27,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, o
           <h2 className="text-xl font-bold">⚙️ 設定</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
             ✕
+          </button>
+        </div>
+
+        {/* ★ テーマ切り替えセクションを追加 */}
+        <div className="space-y-3">
+          <h3 className="font-semibold text-sm text-gray-500 dark:text-gray-400">テーマ設定</h3>
+          <button
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="w-full py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold flex items-center justify-between transition"
+          >
+            <span>表示モード</span>
+            <span>{theme === 'light' ? '☀️ ライトモード (Light)' : '🌙 ダークモード (Dark)'}</span>
           </button>
         </div>
 
