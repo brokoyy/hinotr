@@ -1,5 +1,5 @@
 import React from 'react';
-import { nip19 } from 'nostr-tools'; // インポート元はプロジェクトの構成に合わせて調整してください
+import { nip19 } from 'nostr-tools';
 import type { AppMode, Theme } from '../types/nostr';
 import type { UserProfile } from '../hooks/useNostrTimeline';
 
@@ -26,13 +26,11 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const isDark = theme === 'dark';
 
-  // HEX公開鍵を npub1xxxx...xxxx 形式にフォーマットする関数
   const formatNpub = (hexKey: string) => {
     try {
       const npub = nip19.npubEncode(hexKey);
       return `@${npub.slice(0, 12)}...${npub.slice(-8)}`;
     } catch (e) {
-      // 万が一変換に失敗した場合は元のHEXで安全にフォールバック
       return `@${hexKey.slice(0, 8)}...${hexKey.slice(-8)}`;
     }
   };
@@ -103,35 +101,32 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* ログインアイコン ＆ 設定 */}
         {pubkey ? (
-          <button
-            onClick={onOpenSettings}
-            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition border ${
-              isDark
-                ? 'bg-white/10 hover:bg-white/20 border-white/10'
-                : 'bg-gray-100 hover:bg-gray-200 border-gray-200'
-            }`}
-            title="設定"
-          >
-            {userProfile?.picture ? (
+          userProfile?.picture ? (
+            <button
+              onClick={onOpenSettings}
+              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition border ${
+                isDark
+                  ? 'bg-white/10 hover:bg-white/20 border-white/10'
+                  : 'bg-gray-100 hover:bg-gray-200 border-gray-200'
+              }`}
+              title="設定"
+            >
               <img
                 src={userProfile.picture}
                 alt="Profile"
                 className="w-7 h-7 rounded-full object-cover"
               />
-            ) : (
-              <span className="text-sm">⚙️</span>
-            )}
-            {/* npubの省略表示 */}
-            <span className="text-xs font-mono opacity-80 hidden sm:inline">
-              {formatNpub(pubkey)}
-            </span>
-          </button>
+              <span className="text-xs font-mono opacity-80 hidden sm:inline">
+                {formatNpub(pubkey)}
+              </span>
+            </button>
+          ) : null // アイコンが読み込まれるまでの間の⚙️マークを非表示
         ) : (
           <button
             onClick={onLogin}
             className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-sm transition"
           >
-            ログイン
+            NIP-07でログイン
           </button>
         )}
       </div>

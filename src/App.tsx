@@ -90,12 +90,6 @@ export default function App() {
           {!loading && !pubkey && (
             <div className="p-12 text-center text-sm opacity-80 flex flex-col items-center gap-4">
               <p>NIP-07 拡張機能でログインするとタイムラインが表示されます。</p>
-              <button
-                onClick={handleLogin}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-xl shadow-md transition"
-              >
-                NIP-07 でログイン
-              </button>
             </div>
           )}
 
