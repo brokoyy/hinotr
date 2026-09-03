@@ -105,6 +105,7 @@ export function PostCard({ post, mode }: PostCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [myReaction, setMyReaction] = useState<string | null>(null);
 
+  // プロフィール取得
   useEffect(() => {
     if (profileCache[post.pubkey]) {
       setProfile(profileCache[post.pubkey]);
@@ -140,6 +141,37 @@ export function PostCard({ post, mode }: PostCardProps) {
     };
   }, [post.pubkey]);
 
+  // ★ 自分がこの投稿に付けたリアクション (Kind 7) をリレーから探して復元する
+  useEffect(() => {
+    let isMounted = true;
+    const checkMyReaction = async () => {
+      if (!window.nostr) return;
+      try {
+        // ログイン中の自分のpubkeyを取得 (NIP-07)
+        const myPubkey = await window.nostr.getPublicKey();
+        if (!myPubkey) return;
+
+        // リレーから「自分が書いた、この投稿に対するKind 7イベント」を取得
+        const reactionEvent = await pool.get(DEFAULT_RELAYS, {
+          kinds: [7],
+          authors: [myPubkey],
+          '#e': [post.id],
+        });
+
+        if (reactionEvent && isMounted) {
+          setMyReaction(reactionEvent.content);
+        }
+      } catch (e) {
+        console.error('リアクション復元失敗:', e);
+      }
+    };
+
+    checkMyReaction();
+    return () => {
+      isMounted = false;
+    };
+  }, [post.id]);
+
   // リアクション (Kind 7)
   const handleRandomReaction = async () => {
     if (mode === 'HINOTORI' || !window.nostr) return;
@@ -156,7 +188,7 @@ export function PostCard({ post, mode }: PostCardProps) {
         tags: [
           ['e', post.id],
           ['p', post.pubkey],
-          ['client', 'hinotr'], // リアクションにも一応入れておくと親切
+          ['client', 'hinotr'],
         ],
         content: randomContent,
       };
@@ -203,7 +235,7 @@ export function PostCard({ post, mode }: PostCardProps) {
         tags: [
           ['e', post.id, '', 'reply'],
           ['p', post.pubkey],
-          ['client', 'hinotr'], //  via hinotr を付与
+          ['client', 'hinotr'],
         ],
         content: replyText,
       };
