@@ -12,7 +12,7 @@ const STORAGE_KEY_RELAYS = 'hinotr_relays';
 const STORAGE_KEY_POSTS = 'hinotr_cached_posts';
 
 export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
-  // 1. 初回からlocalStorageのキャッシュ投稿を初期値にする（ゼロちらつき・即時表示）
+  // 1. 初回からlocalStorageのキャッシュ投稿を初期値にする
   const [posts, setPosts] = useState<TimelinePost[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_POSTS);
@@ -54,7 +54,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     const fetchUserData = async () => {
       try {
-        const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://purplepag.es']));
+        const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://relay-jp.nostr.wirednet.jp']));
         
         const relayEvents = await pool.querySync(searchTarget, {
           kinds: [10002],
@@ -213,7 +213,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
   }, [follows, mode, pubkey, relays]);
 
-  // PHANTOMタイマー
+  // PHANTOMのタイマー
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 
