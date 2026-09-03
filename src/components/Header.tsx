@@ -12,17 +12,18 @@ interface HeaderProps {
   userProfile?: UserProfile | null;
   onLogin: () => void;
   onOpenSettings: () => void;
+  onOpenNotifications?: () => void; // ★ 追加: 通知モーダルを開くコールバック（任意）
 }
 
 export const Header: React.FC<HeaderProps> = ({
   mode,
   setMode,
   theme,
-  setTheme,
   pubkey,
   userProfile,
   onLogin,
   onOpenSettings,
+  onOpenNotifications,
 }) => {
   const isDark = theme === 'dark';
 
@@ -85,18 +86,20 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* テーマ切替 */}
+      <div className="flex items-center gap-2">
+        {/* ★ 元のLight/Darkボタンの位置に配置した通知ボタン */}
         <button
-          onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-          className={`p-2 text-xs rounded-xl transition border ${
+          onClick={onOpenNotifications}
+          className={`p-2 text-sm rounded-xl transition border relative ${
             isDark
               ? 'bg-white/10 hover:bg-white/20 text-white border-white/10'
               : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-200'
           }`}
-          title="テーマ切替"
+          title="通知"
         >
-          {theme === 'light' ? '☀️ Light' : '🌙 Dark'}
+          🔥
+          {/* 未読がある場合に光らせるバッジのサンプル（必要に応じて条件分岐できます） */}
+          {/* <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" /> */}
         </button>
 
         {/* ログインアイコン ＆ 設定 */}
