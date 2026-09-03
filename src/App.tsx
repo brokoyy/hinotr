@@ -6,6 +6,7 @@ import { Header } from './components/Header';
 import { PostCard } from './components/PostCard';
 import { PostForm } from './components/PostForm';
 import { SettingsModal } from './components/SettingsModal';
+import { NotificationsModal } from './components/NotificationsModal';
 
 const STORAGE_KEY_PUBKEY = 'hinotr_pubkey';
 const STORAGE_KEY_THEME = 'hinotr_theme';
@@ -26,6 +27,7 @@ export default function App() {
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [isPostFormOpen, setIsPostFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false); // ★ 追加
 
   useEffect(() => {
     const savedKey = localStorage.getItem(STORAGE_KEY_PUBKEY);
@@ -78,10 +80,7 @@ export default function App() {
           userProfile={userProfile}
           onLogin={handleLogin}
           onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenNotifications={() => {
-            // TODO: 通知モーダルを開く処理をここに繋げます
-            alert('通知機能はまもなく実装します！');
-          }}
+          onOpenNotifications={() => setIsNotificationsOpen(true)} // ★ 接続
         />
 
         <main className="flex-1">
@@ -134,6 +133,13 @@ export default function App() {
           relays={relays}
           theme={theme}
           setTheme={setTheme}
+        />
+
+        {/* ★ 通知モーダル */}
+        <NotificationsModal
+          isOpen={isNotificationsOpen}
+          onClose={() => setIsNotificationsOpen(false)}
+          theme={theme}
         />
       </div>
     </div>
