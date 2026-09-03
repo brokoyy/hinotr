@@ -3,9 +3,15 @@ import type { Event as NostrEvent, Filter } from 'nostr-tools';
 import { SimplePool } from 'nostr-tools';
 import { DEFAULT_RELAYS } from '../lib/nostr';
 
+export interface UserProfileMeta {
+  name?: string;
+  display_name?: string;
+  picture?: string;
+}
+
 export interface NotificationItem extends NostrEvent {
-  // 必要に応じてカスタムプロパティを追加可能
-  targetEvent?: NostrEvent; // 対象となった元の投稿データ
+  targetEvent?: NostrEvent;
+  userProfile?: UserProfileMeta; // 送信者のプロフィール
 }
 
 export function useNostrNotifications(pubkey: string | null) {
@@ -34,19 +40,18 @@ export function useNostrNotifications(pubkey: string | null) {
         onevent(event: NostrEvent) {
           if (event.pubkey === pubkey) return;
 
-          // 1. 通知イベントが参照している親ポストのID（eタグ）を抽出する
           const targetEventId = event.tags.find(
             (tag) => tag[0] === 'e'
           )?.[1];
 
-          // 2. まずは通知アイテム自体をリストに追加
+          // 1. まず通知イベントを追加
           setNotifications((prev) => {
             if (prev.some((n) => n.id === event.id)) return prev;
             const updated = [event, ...prev];
             return updated.sort((a, b) => b.created_at - a.created_at);
           });
 
-          // 3. 参照先の親ポストがある場合、リレーからその親ポストのデータを取得して結びつける
+          // 2. 参照先の親ポストを取得
           if (targetEventId) {
             pool.get(DEFAULT_RELAYS, { ids: [targetEventId] }).then((targetEvent) => {
               if (targetEvent) {
@@ -58,6 +63,20 @@ export function useNostrNotifications(pubkey: string | null) {
               }
             }).catch(() => {});
           }
+
+          // 3. 送信者のプロフィール（Kind 0）を取得
+          pool.get(DEFAULT_RELAYS, { kinds: [0], authors: [event.pubkey] }).then((profileEvent) => {
+            if (profileEvent) {
+              try {
+                const profile: UserProfileMeta = JSON.parse(profileEvent.content);
+                setNotifications((prev) =>
+                  prev.map((n) =>
+                    n.pubkey === event.pubkey ? { ...n, userProfile: profile } : n
+                  )
+                );
+              } catch {}
+            }
+          }).catch(() => {});
         },
         oneose() {
           setLoading(false);
