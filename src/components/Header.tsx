@@ -12,7 +12,8 @@ interface HeaderProps {
   userProfile?: UserProfile | null;
   onLogin: () => void;
   onOpenSettings: () => void;
-  onOpenNotifications?: () => void; // ★ 追加: 通知モーダルを開くコールバック（任意）
+  onOpenNotifications?: () => void;
+  hasUnread?: boolean; // ★ 追加: 未読があるかどうかのフラグ
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -24,6 +25,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogin,
   onOpenSettings,
   onOpenNotifications,
+  hasUnread = false, // デフォルトは false
 }) => {
   const isDark = theme === 'dark';
 
@@ -87,19 +89,25 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* ★ 元のLight/Darkボタンの位置に配置した通知ボタン */}
+        {/* 通知ボタン（未読時は animate-pulse で炎が点滅） */}
         <button
           onClick={onOpenNotifications}
           className={`p-2 text-sm rounded-xl transition border relative ${
-            isDark
+            hasUnread
+              ? isDark
+                ? 'bg-orange-500/20 border-orange-500/50 text-orange-400 animate-pulse'
+                : 'bg-orange-100 border-orange-300 text-orange-600 animate-pulse shadow-sm'
+              : isDark
               ? 'bg-white/10 hover:bg-white/20 text-white border-white/10'
               : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-200'
           }`}
           title="通知"
         >
-          🔥
-          {/* 未読がある場合に光らせるバッジのサンプル（必要に応じて条件分岐できます） */}
-          {/* <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" /> */}
+          <span className="inline-block">🔥</span>
+          {/* 未読時にさらに分かりやすくするための赤色ドット（お好みで併用） */}
+          {hasUnread && (
+            <span className="absolute top-1 right-1 w-2 h-2 bg-orange-500 rounded-full animate-ping" />
+          )}
         </button>
 
         {/* ログインアイコン ＆ 設定 */}
