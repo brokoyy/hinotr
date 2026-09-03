@@ -7,4 +7,5 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  publicDir: 'static', // ← static フォルダを静的アセットとして認識させる
 })
