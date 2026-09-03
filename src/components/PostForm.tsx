@@ -21,7 +21,9 @@ export function PostForm({ isOpen, onClose }: PostFormProps) {
       const template = {
         kind: 1,
         created_at: Math.floor(Date.now() / 1000),
-        tags: [],
+        tags: [
+          ['client', 'hinotr'], // via hinotr を付与
+        ],
         content: content,
       };
       const signedEvent = await window.nostr.signEvent(template);
