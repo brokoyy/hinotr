@@ -7,19 +7,35 @@ export interface UserProfile {
   name?: string;
 }
 
+// リレー用のストレージキー
+const STORAGE_KEY_RELAYS = 'hinotr_relays';
+
 export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   const [posts, setPosts] = useState<TimelinePost[]>([]);
   const [follows, setFollows] = useState<string[]>([]);
-  const [relays, setRelays] = useState<string[]>(DEFAULT_RELAYS);
+  
+  // 1. 初回からlocalStorageのリレー（またはデフォルト）を初期値にする
+  const [relays, setRelays] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_RELAYS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      // 読み込み失敗時はフォールバック
+    }
+    return DEFAULT_RELAYS;
+  });
+
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // 1. NIP-65 (Kind 10002) リレーリスト & ユーザープロフィール(Kind 0)の取得
+  // 2. NIP-65 リレーリスト & ユーザープロフィールの取得
   useEffect(() => {
     let isMounted = true;
 
     if (!pubkey) {
-      setRelays(DEFAULT_RELAYS);
       setUserProfile(null);
       return;
     }
@@ -28,7 +44,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       try {
         const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://purplepag.es']));
         
-        // リレーリスト取得
+        // リレーリスト取得 (Kind 10002)
         const relayEvents = await pool.querySync(searchTarget, {
           kinds: [10002],
           authors: [pubkey],
@@ -39,10 +55,12 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           const userRelays = parseNip65Relays(relayEvents[0]);
           if (userRelays.length > 0) {
             setRelays(userRelays);
+            // 次回のためにローカルストレージに保存
+            localStorage.setItem(STORAGE_KEY_RELAYS, JSON.stringify(userRelays));
           }
         }
 
-        // プロフィール(Kind 0)取得
+        // プロフィール取得 (Kind 0)
         const profileEvents = await pool.querySync(searchTarget, {
           kinds: [0],
           authors: [pubkey],
@@ -68,7 +86,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
   }, [pubkey]);
 
-  // 2. フォローリスト取得 (Kind 3)
+  // 3. フォローリスト取得 (Kind 3)
   useEffect(() => {
     let isMounted = true;
 
@@ -110,7 +128,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
   }, [pubkey, relays]);
 
-  // 3. タイムラインの取得（未ログイン時は何も取得しない）
+  // 4. タイムラインの取得
   useEffect(() => {
     let isMounted = true;
 
@@ -177,7 +195,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
   }, [follows, mode, pubkey, relays]);
 
-  // 4. PHANTOMタイマー
+  // PHANTOMタイマー
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 
