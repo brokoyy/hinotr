@@ -12,8 +12,8 @@ export interface UserProfileMeta {
 export interface NotificationItem extends NostrEvent {
   targetEvent?: NostrEvent;
   userProfile?: UserProfileMeta;
-  count?: number;          // まとめた場合の件数
-  senders?: string[];      // まとめた場合の送信者pubkey一覧
+  count?: number;
+  senders?: string[];
 }
 
 export function useNostrNotifications(pubkey: string | null) {
@@ -42,20 +42,20 @@ export function useNostrNotifications(pubkey: string | null) {
         onevent(event: NostrEvent) {
           if (event.pubkey === pubkey) return;
 
-          const targetEventId = event.tags.find(
-            (tag) => tag[0] === 'e'
-          )?.[1];
-
           setNotifications((prev) => {
-            // Kind 6(リポスト) または Kind 7(リアクション) の場合、同じターゲット投稿への通知があればまとめる
+            // 既に存在していれば追加しない
+            if (prev.some((n) => n.id === event.id)) return prev;
+
+            const targetEventId = event.tags.find((tag) => tag[0] === 'e')?.[1];
+
+            // Kind 6(リポスト) または Kind 7(リアクション) で、ターゲットがある場合は集約を試みる
             if ((event.kind === 6 || event.kind === 7) && targetEventId) {
               const existingIndex = prev.findIndex(
-                (n) => n.kind === event.kind && 
+                (n) => n.kind === event.kind &&
                 n.tags.find((t) => t[0] === 'e')?.[1] === targetEventId
               );
 
               if (existingIndex !== -1) {
-                // 既存のグループに統合（カウントを増やし、送信者を追加）
                 const target = prev[existingIndex];
                 const senders = target.senders || [target.pubkey];
                 if (!senders.includes(event.pubkey)) {
@@ -67,25 +67,24 @@ export function useNostrNotifications(pubkey: string | null) {
                   ...target,
                   count: senders.length,
                   senders,
-                  // より新しい日時に更新
                   created_at: Math.max(target.created_at, event.created_at),
+                  userProfile: target.userProfile, // 直近のプロフィールを保持
                 };
                 return updatedList.sort((a, b) => b.created_at - a.created_at);
               }
             }
 
-            // まとめる対象ではない（リプライなど）または初登場のグループ
-            if (prev.some((n) => n.id === event.id)) return prev;
+            // 新規アイテムとして追加
             const newItem: NotificationItem = {
               ...event,
               count: 1,
               senders: [event.pubkey],
             };
-            const updated = [newItem, ...prev];
-            return updated.sort((a, b) => b.created_at - a.created_at);
+            return [newItem, ...prev].sort((a, b) => b.created_at - a.created_at);
           });
 
           // 親ポストの取得
+          const targetEventId = event.tags.find((tag) => tag[0] === 'e')?.[1];
           if (targetEventId) {
             pool.get(DEFAULT_RELAYS, { ids: [targetEventId] }).then((targetEvent) => {
               if (targetEvent) {
@@ -107,7 +106,7 @@ export function useNostrNotifications(pubkey: string | null) {
                 setNotifications((prev) =>
                   prev.map((n) =>
                     n.pubkey === event.pubkey || (n.senders && n.senders.includes(event.pubkey))
-                      ? { ...n, userProfile: profile } // 簡易的に直近のプロフィールを反映
+                      ? { ...n, userProfile: profile }
                       : n
                   )
                 );
@@ -127,6 +126,5 @@ export function useNostrNotifications(pubkey: string | null) {
     };
   }, [pubkey]);
 
-  const sortedNotifications = [...notifications].sort((a, b) => b.created_at - a.created_at);
-  return { notifications: sortedNotifications, loading };
+  return { notifications, loading };
 }
