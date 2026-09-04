@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { nip19 } from 'nostr-tools';
 import type { AppMode, TimelinePost } from '../types/nostr';
 import { pool, DEFAULT_RELAYS } from '../lib/nostr';
+import type { Event as NostrEvent } from 'nostr-tools';
 
 interface PostCardProps {
   post: TimelinePost;
@@ -26,6 +27,9 @@ const profileCache: Record<string, Profile> = {};
 const IMAGE_REGEX = /(https?:\/\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?)/gi;
 const VIDEO_REGEX = /(https?:\/\/[^\s]+?\.(?:mp4|webm|mov)(?:\?[^\s]*)?)/gi;
 const GENERAL_URL_REGEX = /(https?:\/\/[^\s]+)/gi;
+
+// Nostr ビーコン (nevent1, note1, nprofile1 等) を検出する正規表現
+const NOSTR_BEACON_REGEX = /(nostr:)?(nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+)/gi;
 
 // tags から client タグを抽出するヘルパー
 const getClientName = (tags: string[][]) => {
@@ -93,6 +97,114 @@ function LinkCard({ url }: { url: string }) {
         <div className="p-3 text-xs text-blue-500 dark:text-blue-400 underline truncate">{url}</div>
       )}
     </a>
+  );
+}
+
+// 引用された Nostr 投稿をカードとして表示するコンポーネント
+function EmbeddedNoteCard({ beacon }: { beacon: string }) {
+  const [targetEvent, setTargetEvent] = useState<NostrEvent | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const formatPubkey = (hex: string) => {
+    try {
+      const npub = nip19.npubEncode(hex);
+      return `@${npub.slice(0, 8)}...${npub.slice(-4)}`;
+    } catch {
+      return `@${hex.slice(0, 6)}...`;
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTarget = async () => {
+      try {
+        let eventId = '';
+        const cleanBeacon = beacon.replace(/^nostr:/, '');
+        
+        if (cleanBeacon.startsWith('note1') || cleanBeacon.startsWith('nevent1')) {
+          const decoded = nip19.decode(cleanBeacon);
+          if (decoded.type === 'note') {
+            eventId = decoded.data;
+          } else if (decoded.type === 'nevent') {
+            eventId = decoded.data.id;
+          }
+        }
+
+        if (!eventId) {
+          if (isMounted) setLoading(false);
+          return;
+        }
+
+        const event = await pool.get(DEFAULT_RELAYS, { ids: [eventId] });
+        if (event && isMounted) {
+          setTargetEvent(event);
+
+          // 投稿者のプロフィールも取得
+          if (profileCache[event.pubkey]) {
+            setProfile(profileCache[event.pubkey]);
+          } else {
+            const profileEvent = await pool.get(DEFAULT_RELAYS, { kinds: [0], authors: [event.pubkey] });
+            if (profileEvent && isMounted) {
+              const data = JSON.parse(profileEvent.content);
+              const userProfile: Profile = {
+                name: data.name,
+                display_name: data.display_name,
+                picture: data.picture,
+              };
+              profileCache[event.pubkey] = userProfile;
+              setProfile(userProfile);
+            }
+          }
+        }
+      } catch (e) {
+        console.error('引用投稿の取得失敗:', e);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchTarget();
+    return () => {
+      isMounted = false;
+    };
+  }, [beacon]);
+
+  if (loading) {
+    return (
+      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs opacity-50 animate-pulse">
+        引用投稿を読み込み中... ({beacon.slice(0, 16)}...)
+      </div>
+    );
+  }
+
+  if (!targetEvent) {
+    return (
+      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs opacity-60 font-mono">
+        引用投稿が見つかりませんでした ({beacon})
+      </div>
+    );
+  }
+
+  const displayName = profile?.display_name || profile?.name || targetEvent.pubkey.slice(0, 8);
+
+  return (
+    <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/5 text-xs space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {profile?.picture ? (
+            <img src={profile.picture} alt="" className="w-5 h-5 rounded-full object-cover" />
+          ) : (
+            <div className="w-5 h-5 rounded-full bg-slate-300 dark:bg-slate-700" />
+          )}
+          <span className="font-bold truncate max-w-[120px]">{displayName}</span>
+          <span className="opacity-50">{formatPubkey(targetEvent.pubkey)}</span>
+        </div>
+      </div>
+      <p className="line-clamp-3 whitespace-pre-wrap opacity-90">
+        {targetEvent.content}
+      </p>
+    </div>
   );
 }
 
@@ -177,7 +289,6 @@ export function PostCard({ post, mode }: PostCardProps) {
       await pool.publish(DEFAULT_RELAYS, signedEvent);
     } catch (e) {
       console.error('リアクション失敗:', e);
-      // 失敗時は戻す
       setMyReaction(null);
       try {
         localStorage.removeItem(`hinotr_reaction_${post.id}`);
@@ -245,7 +356,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     return `${year}/${month}/${day} ${hours}:${minutes}`;
   };
 
-  // HEX公開鍵を @npub1xxxx...xxxx 形式にフォーマットする関数
   const formatNpub = (hexKey: string) => {
     try {
       const npub = nip19.npubEncode(hexKey);
@@ -256,9 +366,13 @@ export function PostCard({ post, mode }: PostCardProps) {
   };
 
   const renderContent = (content: string) => {
+    // ビーコン、画像、動画、URLをそれぞれ抽出・除外処理
+    const beacons: string[] = (content.match(NOSTR_BEACON_REGEX) || []) as string[];
     const images: string[] = (content.match(IMAGE_REGEX) || []) as string[];
     const videos: string[] = (content.match(VIDEO_REGEX) || []) as string[];
+    
     let textOnly = content
+      .replace(NOSTR_BEACON_REGEX, '')
       .replace(IMAGE_REGEX, '')
       .replace(VIDEO_REGEX, '')
       .trim();
@@ -272,6 +386,11 @@ export function PostCard({ post, mode }: PostCardProps) {
       <div>
         <p className="whitespace-pre-wrap break-words">{textOnly}</p>
         
+        {/* 引用されたNostr投稿カード */}
+        {beacons.map((beacon, i) => (
+          <EmbeddedNoteCard key={i} beacon={beacon} />
+        ))}
+
         {images.map((img, i) => (
           <img
             key={i}
@@ -337,7 +456,6 @@ export function PostCard({ post, mode }: PostCardProps) {
 
           {mode === 'PHANTOM' && (
             <div className="flex items-center justify-between mt-3 text-xs opacity-70">
-              {/* 左側：各種アクションボタン */}
               <div className="flex items-center gap-6">
                 <button
                   onClick={() => setShowReplyBox(!showReplyBox)}
@@ -359,7 +477,6 @@ export function PostCard({ post, mode }: PostCardProps) {
                 </button>
               </div>
 
-              {/* 右側：via クライアント名（右寄せ） */}
               {getClientName(post.tags) && (
                 <span className="opacity-60 text-[11px]">
                   via <span className="font-semibold">{getClientName(post.tags)}</span>
