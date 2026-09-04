@@ -31,29 +31,19 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
     }
   };
 
+  // アイコンと数字（カウント）をシンプルに表示する
   const getNotificationBadge = (kind: number, count?: number) => {
-    // 常にカウントを表示するように修正 (count が undefined の場合は 1 とする)
-    const cnt = ` ${count || 1}`;
+    const cnt = count || 1;
     switch (kind) {
       case 1:
-        return { icon: '💬', label: 'リプライ', color: 'text-blue-500 bg-blue-500/10' };
+        return { icon: '💬', label: `リプライ ${cnt}`, color: 'text-blue-500 bg-blue-500/10' };
       case 6:
-        return { icon: '🔁', label: `リポスト${cnt}`, color: 'text-green-500 bg-green-500/10' };
+        return { icon: '🔁', label: `${cnt}`, color: 'text-green-500 bg-green-500/10' };
       case 7:
-        return { icon: '♡', label: `リアクション${cnt}`, color: 'text-pink-500 bg-pink-500/10' };
+        return { icon: '♡', label: `${cnt}`, color: 'text-pink-500 bg-pink-500/10' };
       default:
-        return { icon: '✨', label: `Kind ${kind}`, color: 'text-orange-500 bg-orange-500/10' };
+        return { icon: '✨', label: `${cnt}`, color: 'text-orange-500 bg-orange-500/10' };
     }
-  };
-
-  const parseNotificationContent = (item: NotificationItem) => {
-    if (item.kind === 6) {
-      return { text: '', note: null }; // リポストはテキストではなく数でスッキリ見せる
-    }
-    return {
-      text: item.content,
-      note: null,
-    };
   };
 
   return (
@@ -97,7 +87,6 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
           {notifications.map((item) => {
             const badge = getNotificationBadge(item.kind, item.count);
-            const parsed = parseNotificationContent(item);
             const profile = item.userProfile;
 
             return (
@@ -111,9 +100,9 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
               >
                 {/* ヘッダー情報（バッジ ＆ 送信者アイコン・名前） */}
                 <div className="flex items-center justify-between text-xs">
-                  <span className={`px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${badge.color}`}>
-                    <span>{badge.icon}</span>
-                    <span>{badge.label}</span>
+                  <span className={`px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 ${badge.color}`}>
+                    <span className="text-sm">{badge.icon}</span>
+                    <span className="font-mono">{badge.label}</span>
                   </span>
 
                   {/* 送信者アイコン ＆ 名前 */}
@@ -136,10 +125,10 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                   </div>
                 </div>
 
-                {/* メインの通知コンテンツ（リプライの場合のみテキスト表示） */}
-                {item.kind === 1 && parsed.text && (
+                {/* リプライの場合のみテキスト表示 */}
+                {item.kind === 1 && item.content && (
                   <p className="text-sm whitespace-pre-wrap break-words opacity-90 font-medium">
-                    {parsed.text}
+                    {item.content}
                   </p>
                 )}
 
