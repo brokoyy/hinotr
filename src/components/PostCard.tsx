@@ -65,7 +65,7 @@ function LinkCard({ url }: { url: string }) {
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl overflow-hidden transition-all duration-200 group my-2"
+      className="block border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl overflow-hidden transition-all duration-200 group my-2 text-slate-900 dark:text-slate-100"
     >
       {loading ? (
         <div className="p-3 text-xs opacity-50 truncate">{url}</div>
@@ -171,7 +171,7 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
 
   if (loading) {
     return (
-      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400 animate-pulse">
+      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-500 dark:text-slate-400 animate-pulse">
         引用投稿を読み込み中... ({beacon.slice(0, 16)}...)
       </div>
     );
@@ -179,7 +179,7 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
 
   if (!targetEvent) {
     return (
-      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-500 dark:text-slate-400 font-mono">
+      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-500 dark:text-slate-400 font-mono">
         引用投稿が見つかりませんでした ({beacon})
       </div>
     );
@@ -188,7 +188,7 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   const displayName = profile?.display_name || profile?.name || targetEvent.pubkey.slice(0, 8);
 
   return (
-    <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 space-y-2">
+    <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-xs text-slate-900 dark:text-slate-100 space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {profile?.picture ? (
@@ -215,7 +215,6 @@ export function PostCard({ post, mode }: PostCardProps) {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 更新時に localStorage からリアクション状態を復元する
   const [myReaction, setMyReaction] = useState<string | null>(() => {
     try {
       const saved = localStorage.getItem(`hinotr_reaction_${post.id}`);
@@ -225,7 +224,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   });
 
-  // プロフィール取得
   useEffect(() => {
     if (profileCache[post.pubkey]) {
       setProfile(profileCache[post.pubkey]);
@@ -261,7 +259,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     };
   }, [post.pubkey]);
 
-  // リアクション (Kind 7)
   const handleRandomReaction = async () => {
     if (mode === 'HINOTORI' || !window.nostr) return;
 
@@ -295,7 +292,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   };
 
-  // リポスト (Kind 6)
   const handleRepost = async () => {
     if (mode === 'HINOTORI' || !window.nostr) return;
     if (!confirm('この投稿をリポストしますか？')) return;
@@ -318,7 +314,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   };
 
-  // リプライ送信 (Kind 1)
   const handleSendReply = async () => {
     if (mode === 'HINOTORI' || !window.nostr || !replyText.trim()) return;
 
@@ -365,7 +360,6 @@ export function PostCard({ post, mode }: PostCardProps) {
   };
 
   const renderContent = (content: string) => {
-    // ビーコン、画像、動画、URLをそれぞれ抽出・除外処理
     const beacons: string[] = (content.match(NOSTR_BEACON_REGEX) || []) as string[];
     const images: string[] = (content.match(IMAGE_REGEX) || []) as string[];
     const videos: string[] = (content.match(VIDEO_REGEX) || []) as string[];
@@ -385,7 +379,6 @@ export function PostCard({ post, mode }: PostCardProps) {
       <div>
         <p className="whitespace-pre-wrap break-words">{textOnly}</p>
         
-        {/* 引用されたNostr投稿カード */}
         {beacons.map((beacon, i) => (
           <EmbeddedNoteCard key={i} beacon={beacon} />
         ))}
@@ -420,7 +413,7 @@ export function PostCard({ post, mode }: PostCardProps) {
 
   return (
     <div
-      className={`p-4 border-b border-slate-200 dark:border-white/10 transition-opacity duration-1000 ${
+      className={`p-4 border-b border-slate-200 dark:border-slate-800 transition-opacity duration-1000 ${
         post.isFading ? 'opacity-20' : 'opacity-100'
       }`}
     >
@@ -491,7 +484,7 @@ export function PostCard({ post, mode }: PostCardProps) {
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="返信を入力..."
-                className="flex-1 px-3 py-1 text-sm rounded border border-slate-300 dark:border-white/20 bg-transparent"
+                className="flex-1 px-3 py-1 text-sm rounded border border-slate-300 dark:border-slate-700 bg-transparent"
               />
               <button
                 onClick={handleSendReply}
