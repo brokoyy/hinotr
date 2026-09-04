@@ -57,9 +57,13 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition"
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+              isDark
+                ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
           >
-            ✕
+            閉じる
           </button>
         </div>
 
@@ -157,19 +161,6 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
               </div>
             );
           })}
-        </div>
-
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end">
-          <button
-            onClick={onClose}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold transition ${
-              isDark
-                ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
-            }`}
-          >
-            閉じる
-          </button>
         </div>
       </div>
     </div>
