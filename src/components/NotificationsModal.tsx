@@ -32,7 +32,8 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   };
 
   const getNotificationBadge = (kind: number, count?: number) => {
-    const cnt = count && count > 1 ? ` ${count}` : '';
+    // 常にカウントを表示するように修正 (count が undefined の場合は 1 とする)
+    const cnt = ` ${count || 1}`;
     switch (kind) {
       case 1:
         return { icon: '💬', label: 'リプライ', color: 'text-blue-500 bg-blue-500/10' };
