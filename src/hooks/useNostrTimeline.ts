@@ -133,7 +133,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     if (mode === 'PHANTOM') {
       const tenMinutesAgo = now - 600;
-      // ★ kindsに 7 (リアクション) を追加
       filter = { kinds: [1, 7], since: tenMinutesAgo, limit: 100, authors: follows };
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
@@ -155,7 +154,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         if (isMounted) {
           const currentTime = Math.floor(Date.now() / 1000);
 
-          // Kind 1（投稿）と Kind 7（リアクション）に分離
           const rawPosts = fetchedEvents.filter(e => e.kind === 1);
           const rawReactions = fetchedEvents.filter(e => e.kind === 7);
 
@@ -163,9 +161,9 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
             ? rawPosts.filter((post) => currentTime - post.created_at < 600)
             : rawPosts;
 
-          // 各投稿にリアクションの配列を紐づける
-          const postsWithReactions = processedEvents.map(post => {
-            const reactions = rawReactions.filter(r => {
+          // 各投稿にリアクションの配列を紐づける（型安全にキャスト）
+          const postsWithReactions: TimelinePost[] = processedEvents.map(post => {
+            const reactions = rawReactions.filter((r: NostrEvent) => {
               const eTag = r.tags.find(t => t[0] === 'e');
               return eTag && eTag[1] === post.id;
             });
@@ -196,11 +194,10 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
               if (currentTime - event.created_at >= 600) return prev;
               if (prev.some((p) => p.id === event.id)) return prev;
 
-              const updated = [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at);
+              const updated: TimelinePost[] = [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at);
               localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(updated));
               return updated;
             } else if (event.kind === 7) {
-              // リアルタイムで受信したリアクションを該当の投稿にマージする
               const targetE = event.tags.find(t => t[0] === 'e');
               if (!targetE) return prev;
               const targetId = targetE[1];
@@ -208,7 +205,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
               const updated = prev.map(p => {
                 if (p.id === targetId) {
                   const existingReactions = p.reactions || [];
-                  if (existingReactions.some(r => r.id === event.id)) return p;
+                  if (existingReactions.some((r: NostrEvent) => r.id === event.id)) return p;
                   return { ...p, reactions: [...existingReactions, event] };
                 }
                 return p;
