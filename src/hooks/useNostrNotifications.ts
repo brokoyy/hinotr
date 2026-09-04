@@ -12,18 +12,12 @@ export interface UserProfileMeta {
 export interface NotificationItem extends NostrEvent {
   targetEvent?: NostrEvent;
   userProfile?: UserProfileMeta;
-  count?: number;
-  senders?: string[];
 }
 
 // 確実に対象の投稿ID（eタグ）を抽出するヘルパー関数
 function getTargetEventId(event: NostrEvent): string | undefined {
   const eTags = event.tags.filter((tag) => tag[0] === 'e');
   if (eTags.length === 0) return undefined;
-
-  // reply や root などのマーカーがあればそれを避けてダイレクトな親を探す、
-  // なければ基本的には最後の e タグが直接のターゲット（または最初のもの）
-  // ここでは確実性を上げるため、最後の e タグ（直近のターゲット）を採用
   const targetTag = eTags[eTags.length - 1];
   return targetTag ? targetTag[1] : undefined;
 }
@@ -95,44 +89,18 @@ export function useNostrNotifications(pubkey: string | null) {
     };
   }, [pubkey]);
 
-  // rawEvents をもとに、Kind 6 と Kind 7 をターゲット単位でグループ化する
-  const notifications = useMemo(() => {
-    const map = new Map<string, NotificationItem>();
-    const sorted = [...rawEvents].sort((a, b) => a.created_at - b.created_at);
-
-    for (const event of sorted) {
-      const targetEventId = getTargetEventId(event);
-      const isAggregatable = (event.kind === 6 || event.kind === 7) && targetEventId;
-      const groupKey = isAggregatable ? `${event.kind}-${targetEventId}` : `single-${event.id}`;
-
-      if (map.has(groupKey)) {
-        const existing = map.get(groupKey)!;
-        const senders = existing.senders || [existing.pubkey];
-        
-        if (!senders.includes(event.pubkey)) {
-          senders.push(event.pubkey);
-        }
-
-        map.set(groupKey, {
-          ...existing,
-          count: senders.length,
-          senders,
-          created_at: Math.max(existing.created_at, event.created_at),
-          targetEvent: targetEventId ? targetEvents[targetEventId] || existing.targetEvent : undefined,
-          userProfile: profiles[event.pubkey] || existing.userProfile,
-        });
-      } else {
-        map.set(groupKey, {
+  // グループ化を行わず、受信した通知イベントを個別にリスト化して新しい順にソートする
+  const notifications: NotificationItem[] = useMemo(() => {
+    return rawEvents
+      .map((event) => {
+        const targetEventId = getTargetEventId(event);
+        return {
           ...event,
-          count: 1,
-          senders: [event.pubkey],
           targetEvent: targetEventId ? targetEvents[targetEventId] : undefined,
           userProfile: profiles[event.pubkey],
-        });
-      }
-    }
-
-    return Array.from(map.values()).sort((a, b) => b.created_at - a.created_at);
+        };
+      })
+      .sort((a, b) => b.created_at - a.created_at);
   }, [rawEvents, targetEvents, profiles]);
 
   return { notifications, loading };
