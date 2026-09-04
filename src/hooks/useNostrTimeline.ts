@@ -129,7 +129,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     if (!pubkey || follows.length === 0) return;
 
     const now = Math.floor(Date.now() / 1000);
-    let filter: any = {};
+    let filter: Record<string, any> = {};
 
     if (mode === 'PHANTOM') {
       const tenMinutesAgo = now - 600;
@@ -150,7 +150,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     const fetchPosts = async () => {
       try {
-        const rawPosts = (await pool.querySync(relays, filter)) as NostrEvent[];
+        const rawPosts = (await pool.querySync(relays, filter as any)) as NostrEvent[];
         if (isMounted) {
           const currentTime = Math.floor(Date.now() / 1000);
 
@@ -164,10 +164,11 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           let rawReactions: NostrEvent[] = [];
           if (postIds.length > 0) {
             try {
-              rawReactions = (await pool.querySync(relays, {
+              const reactionFilter: Record<string, any> = {
                 kinds: [7],
                 '#e': postIds,
-              } as any)) as NostrEvent[];
+              };
+              rawReactions = (await pool.querySync(relays, reactionFilter)) as NostrEvent[];
             } catch (err) {
               console.error('リアクション取得エラー:', err);
             }
@@ -195,7 +196,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     fetchPosts();
 
     if (mode === 'PHANTOM') {
-      const sub = pool.subscribeMany(relays, [filter], {
+      const sub = pool.subscribeMany(relays, [filter as any], {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
 
