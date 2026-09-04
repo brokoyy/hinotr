@@ -54,7 +54,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           kinds: [10002],
           authors: [pubkey],
           limit: 1,
-        });
+        } as any);
 
         if (isMounted && relayEvents.length > 0) {
           const userRelays = parseNip65Relays(relayEvents[0]);
@@ -68,7 +68,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           kinds: [0],
           authors: [pubkey],
           limit: 1,
-        });
+        } as any);
 
         if (isMounted && profileEvents.length > 0) {
           const metadata = JSON.parse(profileEvents[0].content);
@@ -101,7 +101,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           kinds: [3],
           authors: [pubkey],
           limit: 1,
-        });
+        } as any);
 
         if (isMounted) {
           if (events.length > 0) {
@@ -123,7 +123,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // タイムラインの取得（Kind 1 取得後に対応するリアクション Kind 7 を取得）
+  // タイムラインの取得
   useEffect(() => {
     let isMounted = true;
     if (!pubkey || follows.length === 0) return;
@@ -160,7 +160,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
           const postIds = new Set(processedEvents.map((p) => p.id));
 
-          // リアクション (Kind 7) を取得（クエリ全体を as any でキャスト）
+          // リアクション (Kind 7) の取得
           let rawReactions: NostrEvent[] = [];
           if (postIds.size > 0) {
             try {
@@ -174,7 +174,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           }
 
           const postsWithReactions = processedEvents.map((post) => {
-            const reactions = rawReactions.filter((r) => {
+            const reactions = rawReactions.filter((r: NostrEvent) => {
               const eTag = r.tags.find((t) => t[0] === 'e');
               return eTag && postIds.has(eTag[1]) && eTag[1] === post.id;
             });
