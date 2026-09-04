@@ -194,9 +194,11 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   const displayName = profile?.display_name || profile?.name || targetEvent.pubkey.slice(0, 8);
 
   return (
-    <div 
-      className="my-2 p-3 rounded-xl text-xs space-y-2 shadow-sm"
-      style={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc', borderWidth: '1px' }}
+    <div
+      className={`p-4 transition-opacity duration-1000 ${
+        post.isFading ? 'opacity-20' : 'opacity-100'
+      }`}
+      style={{ borderBottom: '1px solid #1e293b' }} // 暗いボーダー線
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
