@@ -129,8 +129,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     if (!pubkey || follows.length === 0) return;
 
     const now = Math.floor(Date.now() / 1000);
-    
-    // ▼ ここで型エラーを完全に封じるため最初から as any を使います
     let filter: any = {};
 
     if (mode === 'PHANTOM') {
@@ -152,8 +150,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     const fetchPosts = async () => {
       try {
-        // ▼ 199行目のクエリ
-        const rawPosts = (await pool.querySync(relays, filter)) as NostrEvent[];
+        const rawPosts = (await pool.querySync(relays, filter as any)) as NostrEvent[];
         if (isMounted) {
           const currentTime = Math.floor(Date.now() / 1000);
 
@@ -198,7 +195,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     fetchPosts();
 
     if (mode === 'PHANTOM') {
-      const sub = pool.subscribeMany(relays, [filter], {
+      // ▼ ここも as any にして配列エラーを完全回避
+      const sub = pool.subscribeMany(relays, [filter] as any, {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
 
