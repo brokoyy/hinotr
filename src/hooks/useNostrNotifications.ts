@@ -11,7 +11,9 @@ export interface UserProfileMeta {
 
 export interface NotificationItem extends NostrEvent {
   targetEvent?: NostrEvent;
-  userProfile?: UserProfileMeta; // 送信者のプロフィール
+  userProfile?: UserProfileMeta;
+  count?: number;          // まとめた場合の件数
+  senders?: string[];      // まとめた場合の送信者pubkey一覧
 }
 
 export function useNostrNotifications(pubkey: string | null) {
@@ -44,34 +46,69 @@ export function useNostrNotifications(pubkey: string | null) {
             (tag) => tag[0] === 'e'
           )?.[1];
 
-          // 1. まず通知イベントを追加
           setNotifications((prev) => {
+            // Kind 6(リポスト) または Kind 7(リアクション) の場合、同じターゲット投稿への通知があればまとめる
+            if ((event.kind === 6 || event.kind === 7) && targetEventId) {
+              const existingIndex = prev.findIndex(
+                (n) => n.kind === event.kind && 
+                n.tags.find((t) => t[0] === 'e')?.[1] === targetEventId
+              );
+
+              if (existingIndex !== -1) {
+                // 既存のグループに統合（カウントを増やし、送信者を追加）
+                const target = prev[existingIndex];
+                const senders = target.senders || [target.pubkey];
+                if (!senders.includes(event.pubkey)) {
+                  senders.push(event.pubkey);
+                }
+
+                const updatedList = [...prev];
+                updatedList[existingIndex] = {
+                  ...target,
+                  count: senders.length,
+                  senders,
+                  // より新しい日時に更新
+                  created_at: Math.max(target.created_at, event.created_at),
+                };
+                return updatedList.sort((a, b) => b.created_at - a.created_at);
+              }
+            }
+
+            // まとめる対象ではない（リプライなど）または初登場のグループ
             if (prev.some((n) => n.id === event.id)) return prev;
-            const updated = [event, ...prev];
+            const newItem: NotificationItem = {
+              ...event,
+              count: 1,
+              senders: [event.pubkey],
+            };
+            const updated = [newItem, ...prev];
             return updated.sort((a, b) => b.created_at - a.created_at);
           });
 
-          // 2. 参照先の親ポストを取得
+          // 親ポストの取得
           if (targetEventId) {
             pool.get(DEFAULT_RELAYS, { ids: [targetEventId] }).then((targetEvent) => {
               if (targetEvent) {
                 setNotifications((prev) =>
-                  prev.map((n) =>
-                    n.id === event.id ? { ...n, targetEvent } : n
-                  )
+                  prev.map((n) => {
+                    const nTargetId = n.tags.find((t) => t[0] === 'e')?.[1];
+                    return nTargetId === targetEventId ? { ...n, targetEvent } : n;
+                  })
                 );
               }
             }).catch(() => {});
           }
 
-          // 3. 送信者のプロフィール（Kind 0）を取得
+          // 送信者のプロフィール取得
           pool.get(DEFAULT_RELAYS, { kinds: [0], authors: [event.pubkey] }).then((profileEvent) => {
             if (profileEvent) {
               try {
                 const profile: UserProfileMeta = JSON.parse(profileEvent.content);
                 setNotifications((prev) =>
                   prev.map((n) =>
-                    n.pubkey === event.pubkey ? { ...n, userProfile: profile } : n
+                    n.pubkey === event.pubkey || (n.senders && n.senders.includes(event.pubkey))
+                      ? { ...n, userProfile: profile } // 簡易的に直近のプロフィールを反映
+                      : n
                   )
                 );
               } catch {}
@@ -90,5 +127,6 @@ export function useNostrNotifications(pubkey: string | null) {
     };
   }, [pubkey]);
 
-  return { notifications, loading };
+  const sortedNotifications = [...notifications].sort((a, b) => b.created_at - a.created_at);
+  return { notifications: sortedNotifications, loading };
 }
