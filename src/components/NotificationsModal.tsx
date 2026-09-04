@@ -31,18 +31,16 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
     }
   };
 
-  // アイコンと数字（カウント）をシンプルに表示する
-  const getNotificationBadge = (kind: number, count?: number) => {
-    const cnt = count || 1;
+  const getNotificationBadge = (kind: number) => {
     switch (kind) {
       case 1:
-        return { icon: '💬', label: `リプライ ${cnt}`, color: 'text-blue-500 bg-blue-500/10' };
+        return { icon: '💬', label: 'リプライ', color: 'text-blue-500 bg-blue-500/10' };
       case 6:
-        return { icon: '🔁', label: `${cnt}`, color: 'text-green-500 bg-green-500/10' };
+        return { icon: '🔁', label: 'リポスト', color: 'text-green-500 bg-green-500/10' };
       case 7:
-        return { icon: '♡', label: `${cnt}`, color: 'text-pink-500 bg-pink-500/10' };
+        return { icon: '♡', label: 'リアクション', color: 'text-pink-500 bg-pink-500/10' };
       default:
-        return { icon: '✨', label: `${cnt}`, color: 'text-orange-500 bg-orange-500/10' };
+        return { icon: '✨', label: '通知', color: 'text-orange-500 bg-orange-500/10' };
     }
   };
 
@@ -86,7 +84,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
           )}
 
           {notifications.map((item) => {
-            const badge = getNotificationBadge(item.kind, item.count);
+            const badge = getNotificationBadge(item.kind);
             const profile = item.userProfile;
 
             return (
@@ -116,19 +114,21 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                     ) : (
                       <div className="w-5 h-5 rounded-full bg-slate-400 animate-pulse" />
                     )}
-                    <span className="font-medium opacity-90 truncate max-w-[120px]">
+                    <span className="font-medium opacity-90 truncate max-w-[140px]">
                       {profile?.display_name || profile?.name || formatPubkey(item.pubkey)}
                     </span>
-                    {item.count && item.count > 1 && (
-                      <span className="text-[10px] opacity-60 font-mono">他</span>
-                    )}
                   </div>
                 </div>
 
-                {/* リプライの場合のみテキスト表示 */}
+                {/* リプライやリアクションの内容表示 */}
                 {item.kind === 1 && item.content && (
                   <p className="text-sm whitespace-pre-wrap break-words opacity-90 font-medium">
                     {item.content}
+                  </p>
+                )}
+                {item.kind === 7 && item.content && (
+                  <p className="text-xs opacity-80">
+                    リアクション: <span className="font-bold">{item.content}</span>
                   </p>
                 )}
 
