@@ -7,12 +7,10 @@ export interface UserProfile {
   name?: string;
 }
 
-// ストレージキー
 const STORAGE_KEY_RELAYS = 'hinotr_relays';
 const STORAGE_KEY_POSTS = 'hinotr_cached_posts';
 
 export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
-  // 1. 初回からlocalStorageのキャッシュ投稿を初期値にする
   const [posts, setPosts] = useState<TimelinePost[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_POSTS);
@@ -20,15 +18,12 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch (e) {
-      // 読み込み失敗時は空
-    }
+    } catch (e) {}
     return [];
   });
 
   const [follows, setFollows] = useState<string[]>([]);
   
-  // リレーの初期値
   const [relays, setRelays] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_RELAYS);
@@ -46,7 +41,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   // 2. NIP-65 リレーリスト & ユーザープロフィールの取得
   useEffect(() => {
     let isMounted = true;
-
     if (!pubkey) {
       setUserProfile(null);
       return;
@@ -89,16 +83,12 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
 
     fetchUserData();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [pubkey]);
 
   // 3. フォローリスト取得 (Kind 3)
   useEffect(() => {
     let isMounted = true;
-
     if (!pubkey) {
       setFollows([]);
       return;
@@ -130,36 +120,31 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     };
 
     fetchFollows();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // 4. タイムラインの取得（キャッシュがあるためローディング表示を挟まず裏で更新）
+  // 4. タイムラインの取得（Kind 1 投稿と Kind 7 リアクションを同時に取得）
   useEffect(() => {
     let isMounted = true;
-
-    if (!pubkey || follows.length === 0) {
-      return;
-    }
+    if (!pubkey || follows.length === 0) return;
 
     const now = Math.floor(Date.now() / 1000);
     let filter: any = {};
 
     if (mode === 'PHANTOM') {
       const tenMinutesAgo = now - 600;
-      filter = { kinds: [1], since: tenMinutesAgo, limit: 50, authors: follows };
+      // ★ kindsに 7 (リアクション) を追加
+      filter = { kinds: [1, 7], since: tenMinutesAgo, limit: 100, authors: follows };
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
       const SIX_HOURS = 6 * 60 * 60;
       const oneYearAgoNow = now - ONE_YEAR;
 
       filter = {
-        kinds: [1],
+        kinds: [1, 7],
         since: oneYearAgoNow - SIX_HOURS,
         until: oneYearAgoNow,
-        limit: 200,
+        limit: 300,
         authors: follows,
       };
     }
@@ -169,15 +154,26 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         const fetchedEvents = (await pool.querySync(relays, filter)) as NostrEvent[];
         if (isMounted) {
           const currentTime = Math.floor(Date.now() / 1000);
-          
-          const processedEvents = mode === 'PHANTOM'
-            ? fetchedEvents.filter((post) => currentTime - post.created_at < 600)
-            : fetchedEvents;
 
-          const sorted = processedEvents.sort((a, b) => b.created_at - a.created_at);
+          // Kind 1（投稿）と Kind 7（リアクション）に分離
+          const rawPosts = fetchedEvents.filter(e => e.kind === 1);
+          const rawReactions = fetchedEvents.filter(e => e.kind === 7);
+
+          const processedEvents = mode === 'PHANTOM'
+            ? rawPosts.filter((post) => currentTime - post.created_at < 600)
+            : rawPosts;
+
+          // 各投稿にリアクションの配列を紐づける
+          const postsWithReactions = processedEvents.map(post => {
+            const reactions = rawReactions.filter(r => {
+              const eTag = r.tags.find(t => t[0] === 'e');
+              return eTag && eTag[1] === post.id;
+            });
+            return { ...post, reactions };
+          });
+
+          const sorted = postsWithReactions.sort((a, b) => b.created_at - a.created_at);
           setPosts(sorted);
-          
-          // 最新の取得結果でキャッシュを更新
           localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sorted));
         }
       } catch (e) {
@@ -193,15 +189,34 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       const sub = pool.subscribeMany(relays, filter, {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
-          const currentTime = Math.floor(Date.now() / 1000);
-          if (currentTime - event.created_at >= 600) return;
 
           setPosts((prev) => {
-            if (prev.some((p) => p.id === event.id)) return prev;
-            const updated = [event, ...prev].sort((a, b) => b.created_at - a.created_at);
-            // リアルタイム追加時もキャッシュを更新
-            localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(updated));
-            return updated;
+            if (event.kind === 1) {
+              const currentTime = Math.floor(Date.now() / 1000);
+              if (currentTime - event.created_at >= 600) return prev;
+              if (prev.some((p) => p.id === event.id)) return prev;
+
+              const updated = [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at);
+              localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(updated));
+              return updated;
+            } else if (event.kind === 7) {
+              // リアルタイムで受信したリアクションを該当の投稿にマージする
+              const targetE = event.tags.find(t => t[0] === 'e');
+              if (!targetE) return prev;
+              const targetId = targetE[1];
+
+              const updated = prev.map(p => {
+                if (p.id === targetId) {
+                  const existingReactions = p.reactions || [];
+                  if (existingReactions.some(r => r.id === event.id)) return p;
+                  return { ...p, reactions: [...existingReactions, event] };
+                }
+                return p;
+              });
+              localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(updated));
+              return updated;
+            }
+            return prev;
           });
         },
       });
