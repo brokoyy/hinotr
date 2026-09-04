@@ -473,9 +473,10 @@ export function PostCard({ post, mode }: PostCardProps) {
                 </button>
                 <button
                   onClick={handleRandomReaction}
-                  className="hover:text-red-500 flex items-center gap-1"
+                  className="hover:text-red-500 flex items-center gap-1.5"
                 >
-                  {myReaction ? myReaction : '♡'}
+                  <span>{myReaction ? myReaction : '♡'}</span>
+                  <span className="text-xs">{myReaction ? '1' : ''}</span>
                 </button>
               </div>
 
