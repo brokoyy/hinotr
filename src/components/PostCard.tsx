@@ -194,13 +194,10 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   const displayName = profile?.display_name || profile?.name || targetEvent.pubkey.slice(0, 8);
 
   return (
-    <div
-      className={`p-4 transition-opacity duration-1000 ${
-        post.isFading ? 'opacity-20' : 'opacity-100'
-      }`}
-      style={{ borderBottom: '1px solid #1e293b' }} // 暗いボーダー線
+    <div 
+      className="my-2 p-3 rounded-xl text-xs space-y-2 shadow-sm"
+      style={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc', borderWidth: '1px' }}
     >
-
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {profile?.picture ? (
@@ -425,9 +422,10 @@ export function PostCard({ post, mode }: PostCardProps) {
 
   return (
     <div
-      className={`p-4 border-b border-slate-200 dark:border-slate-800 transition-opacity duration-1000 ${
+      className={`p-4 transition-opacity duration-1000 ${
         post.isFading ? 'opacity-20' : 'opacity-100'
       }`}
+      style={{ borderBottom: '1px solid #1e293b' }}
     >
       <div className="flex items-start gap-3">
         {profile?.picture ? (
