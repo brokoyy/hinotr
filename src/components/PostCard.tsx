@@ -200,6 +200,7 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
       }`}
       style={{ borderBottom: '1px solid #1e293b' }} // 暗いボーダー線
     >
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {profile?.picture ? (
