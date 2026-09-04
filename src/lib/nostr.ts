@@ -1,7 +1,7 @@
 import { SimplePool } from 'nostr-tools';
 import type { NostrEvent } from '../types/nostr';
 
-// デフォルト接続用リレイ
+// デフォルト接続用リレー
 export const DEFAULT_RELAYS = [
   'wss://r.kojira.io',
   'wss://relay-jp.nostr.wirednet.jp',
