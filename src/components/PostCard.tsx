@@ -222,10 +222,8 @@ export function PostCard({ post, mode }: PostCardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReacting, setIsReacting] = useState(false);
 
-  // 取得したリアクションデータ
   const fetchedReactions: NostrEvent[] = (post as any).reactions || [];
 
-  // ローカルストレージから自分が押したリアクションを復元
   const [myReaction, setMyReaction] = useState<string | null>(() => {
     try {
       return localStorage.getItem(`hinotr_reaction_${post.id}`) || null;
@@ -234,23 +232,23 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   });
 
-  // リアクションを絵文字（content）ごとに集計する
-  const reactionCounts = fetchedReactions.reduce((acc, r) => {
-    // 空文字の場合は "+"（いわゆる「いいね」のデフォルト扱いにすることが多いがそのままcontentを使う）
-    const content = r.content.trim() === '' ? '+' : r.content;
-    acc[content] = (acc[content] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // ▼ すべてのリアクションを強制的に 1つの絵文字（例: "🎤"）にまとめて集計する！
+  // どんな絵文字や +1（空文字）が来ても、すべてひっくるめてカウントします
+  const unifiedEmoji = '🎤';
+  let totalCount = fetchedReactions.length;
 
-  // もし自分がローカルでリアクションを追加していて、まだフェッチデータに反映されていなければカウントに加算
-  if (myReaction) {
-    const key = myReaction;
-    // まだサーバーからの配列に含まれていないと仮定して、自分の分を足す（簡易的重複防止）
-    const hasMyReactionInFetched = fetchedReactions.some((r) => r.content === myReaction);
-    if (!hasMyReactionInFetched) {
-      reactionCounts[key] = (reactionCounts[key] || 0) + 1;
-    }
-  }
+  // もし自分がローカルでリアクションをしていて、それがまだフェッチに含まれていなければ +1
+  const hasMyReactionInFetched = fetchedReactions.some(
+    (r) => r.pubkey === (window.nostr ? /* 自分のpubkeyが取れればベストだが簡易的に判定 */ r.pubkey : '')
+  );
+  
+  // 単純に「自分がlocalstorageで押していて、かつfetchedに自分の分がまだ反映されていないかも？」を考慮
+  // ここではシンプルに fetchedReactions の総数 ＋ (自分が押してて未反映なら1) で計算
+  const isLocalStorageActive = !!myReaction;
+  
+  // ※フェッチ済みに自分のリアクションが含まれているか厳密に判定しなくても、
+  // 「すれ違いを防ぐため、自分が押した事実があればカウントを底上げする」形にします
+  const displayCount = totalCount === 0 && isLocalStorageActive ? 1 : Math.max(totalCount, isLocalStorageActive ? 1 : 0);
 
   useEffect(() => {
     if (profileCache[post.pubkey]) {
@@ -287,19 +285,14 @@ export function PostCard({ post, mode }: PostCardProps) {
     };
   }, [post.pubkey]);
 
-  const handleRandomReaction = async () => {
+  const handleReactionClick = async () => {
     if (mode === 'HINOTORI' || !window.nostr || isReacting) return;
-
-    // すでに何かリアクションしている場合は連続で押させない
     if (myReaction) return;
 
-    const reactions = ['🎤', '🎸'];
-    const randomContent = reactions[Math.floor(Math.random() * reactions.length)];
-
     setIsReacting(true);
-    setMyReaction(randomContent);
+    setMyReaction(unifiedEmoji);
     try {
-      localStorage.setItem(`hinotr_reaction_${post.id}`, randomContent);
+      localStorage.setItem(`hinotr_reaction_${post.id}`, unifiedEmoji);
     } catch {}
 
     try {
@@ -311,7 +304,7 @@ export function PostCard({ post, mode }: PostCardProps) {
           ['p', post.pubkey],
           ['client', 'hinotr'],
         ],
-        content: randomContent,
+        content: unifiedEmoji, // 常に 🎤 で送信する
       };
       const signedEvent = await window.nostr.signEvent(template);
       await pool.publish(DEFAULT_RELAYS, signedEvent);
@@ -476,37 +469,20 @@ export function PostCard({ post, mode }: PostCardProps) {
                   🔁 <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン群（絵文字ごとに表示・集計） */}
+                {/* リアクションボタン（常に 🎤 にまとめて表示） */}
                 <div className="flex items-center gap-2">
-                  {Object.keys(reactionCounts).length > 0 ? (
-                    Object.entries(reactionCounts).map(([emoji, count]) => {
-                      const isMyChoice = myReaction === emoji;
-                      return (
-                        <button
-                          key={emoji}
-                          onClick={handleRandomReaction}
-                          disabled={!!myReaction}
-                          className={`flex items-center gap-1 px-2 py-0.5 rounded-full border transition-colors ${
-                            isMyChoice 
-                              ? 'border-red-500 text-red-500 bg-red-500/10' 
-                              : 'border-slate-700 hover:border-slate-500'
-                          }`}
-                        >
-                          <span>{emoji}</span>
-                          <span className="text-xs">{count}</span>
-                        </button>
-                      );
-                    })
-                  ) : (
-                    /* まだ一つもリアクションがない場合の初期ボタン */
-                    <button
-                      onClick={handleRandomReaction}
-                      disabled={!!myReaction}
-                      className="hover:text-red-500 flex items-center gap-1.5 border border-slate-700 px-2 py-0.5 rounded-full"
-                    >
-                      <span>♡</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={handleReactionClick}
+                    disabled={!!myReaction}
+                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${
+                      myReaction 
+                        ? 'border-red-500 text-red-500 bg-red-500/10' 
+                        : 'border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    <span>{unifiedEmoji}</span>
+                    <span className="text-xs font-bold">{displayCount}</span>
+                  </button>
                 </div>
               </div>
 
