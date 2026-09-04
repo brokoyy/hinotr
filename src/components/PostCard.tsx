@@ -232,10 +232,14 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   });
 
-  const unifiedEmoji = '🎤';
-  const totalCount = fetchedReactions.length;
+  const totalFetchedCount = fetchedReactions.length;
   const isLocalStorageActive = !!myReaction;
-  const displayCount = totalCount === 0 && isLocalStorageActive ? 1 : Math.max(totalCount, isLocalStorageActive ? 1 : 0);
+
+  // 未リアクションの場合は ♡ で、取得できたリアクション総数を表示
+  // リアクション済みの場合は 🎤 で、総数（または自分が押した分の補正込み）を表示
+  const displayCount = totalFetchedCount === 0 && isLocalStorageActive 
+    ? 1 
+    : Math.max(totalFetchedCount, isLocalStorageActive ? 1 : 0);
 
   useEffect(() => {
     if (profileCache[post.pubkey]) {
@@ -276,10 +280,12 @@ export function PostCard({ post, mode }: PostCardProps) {
     if (mode === 'HINOTORI' || !window.nostr || isReacting) return;
     if (myReaction) return;
 
+    const reactionEmoji = '🎤';
+
     setIsReacting(true);
-    setMyReaction(unifiedEmoji);
+    setMyReaction(reactionEmoji);
     try {
-      localStorage.setItem(`hinotr_reaction_${post.id}`, unifiedEmoji);
+      localStorage.setItem(`hinotr_reaction_${post.id}`, reactionEmoji);
     } catch {}
 
     try {
@@ -291,7 +297,7 @@ export function PostCard({ post, mode }: PostCardProps) {
           ['p', post.pubkey],
           ['client', 'hinotr'],
         ],
-        content: unifiedEmoji,
+        content: reactionEmoji,
       };
       const signedEvent = await window.nostr.signEvent(template);
       await pool.publish(DEFAULT_RELAYS, signedEvent);
@@ -456,18 +462,18 @@ export function PostCard({ post, mode }: PostCardProps) {
                   🔁 <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン */}
+                {/* リアクションボタン（未読時は ♡、押した後は 🎤 に変化） */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReactionClick}
                     disabled={!!myReaction}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded-full border transition-colors ${
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
                       myReaction 
                         ? 'border-red-500 text-red-500 bg-red-500/10' 
-                        : 'border-slate-700 hover:border-slate-500'
+                        : 'border-slate-700 hover:border-slate-500 hover:text-red-500'
                     }`}
                   >
-                    <span>{unifiedEmoji}</span>
+                    <span>{myReaction ? '🎤' : '♡'}</span>
                     <span className="text-xs font-bold">{displayCount}</span>
                   </button>
                 </div>
