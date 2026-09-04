@@ -38,7 +38,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // 2. NIP-65 リレーリスト & ユーザープロフィールの取得
+  // NIP-65 リレーリスト & ユーザープロフィールの取得
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) {
@@ -86,7 +86,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey]);
 
-  // 3. フォローリスト取得 (Kind 3)
+  // フォローリスト取得 (Kind 3)
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) {
@@ -123,7 +123,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // 4. タイムラインの取得
+  // タイムラインの取得（Kind 1 取得後に対応するリアクション Kind 7 を別クエリで取得）
   useEffect(() => {
     let isMounted = true;
     if (!pubkey || follows.length === 0) return;
@@ -133,14 +133,14 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     if (mode === 'PHANTOM') {
       const tenMinutesAgo = now - 600;
-      filter = { kinds: [1, 7], since: tenMinutesAgo, limit: 100, authors: follows };
+      filter = { kinds: [1], since: tenMinutesAgo, limit: 100, authors: follows };
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
       const SIX_HOURS = 6 * 60 * 60;
       const oneYearAgoNow = now - ONE_YEAR;
 
       filter = {
-        kinds: [1, 7],
+        kinds: [1],
         since: oneYearAgoNow - SIX_HOURS,
         until: oneYearAgoNow,
         limit: 300,
@@ -150,17 +150,38 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     const fetchPosts = async () => {
       try {
-        const fetchedEvents = (await pool.querySync(relays, filter)) as NostrEvent[];
+        const rawPosts = (await pool.querySync(relays, filter)) as NostrEvent[];
         if (isMounted) {
           const currentTime = Math.floor(Date.now() / 1000);
-
-          const rawPosts = fetchedEvents.filter(e => e.kind === 1);
 
           const processedEvents = mode === 'PHANTOM'
             ? rawPosts.filter((post) => currentTime - post.created_at < 600)
             : rawPosts;
 
-          const sorted = processedEvents.sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
+          const postIds = processedEvents.map((p) => p.id);
+
+          // 取得した投稿に対するリアクション (Kind 7) を取得
+          let rawReactions: NostrEvent[] = [];
+          if (postIds.length > 0) {
+            try {
+              rawReactions = (await pool.querySync(relays, {
+                kinds: [7],
+                '#e': postIds,
+              })) as NostrEvent[];
+            } catch (err) {
+              console.error('リアクション取得エラー:', err);
+            }
+          }
+
+          const postsWithReactions = processedEvents.map((post) => {
+            const reactions = rawReactions.filter((r) => {
+              const eTag = r.tags.find((t) => t[0] === 'e');
+              return eTag && eTag[1] === post.id;
+            });
+            return { ...post, reactions };
+          });
+
+          const sorted = postsWithReactions.sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
           setPosts(sorted);
           localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sorted));
         }
@@ -174,22 +195,21 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     fetchPosts();
 
     if (mode === 'PHANTOM') {
-      const sub = pool.subscribeMany(relays, filter, {
+      const sub = pool.subscribeMany(relays, [filter], {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
 
-          setPosts((prev) => {
-            if (event.kind === 1) {
+          if (event.kind === 1) {
+            setPosts((prev) => {
               const currentTime = Math.floor(Date.now() / 1000);
               if (currentTime - event.created_at >= 600) return prev;
               if (prev.some((p) => p.id === event.id)) return prev;
 
-              const updated = [event as TimelinePost, ...prev].sort((a, b) => b.created_at - a.created_at);
+              const updated = [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
               localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(updated));
               return updated;
-            }
-            return prev;
-          });
+            });
+          }
         },
       });
 
