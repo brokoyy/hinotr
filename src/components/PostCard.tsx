@@ -235,11 +235,19 @@ export function PostCard({ post, mode }: PostCardProps) {
   const totalFetchedCount = fetchedReactions.length;
   const isLocalStorageActive = !!myReaction;
 
-  // 未リアクションの場合は ♡ で、取得できたリアクション総数を表示
-  // リアクション済みの場合は 🎤 で、総数（または自分が押した分の補正込み）を表示
-  const displayCount = totalFetchedCount === 0 && isLocalStorageActive 
-    ? 1 
-    : Math.max(totalFetchedCount, isLocalStorageActive ? 1 : 0);
+  // ▼ 修正：未リアクションならフェッチされた数、リアクション済みなら「フェッチされた数 ＋ 自分の1」にする
+  // （※もしフェッチされた中に既に自分の分が含まれている可能性がある場合の二重カウントを防ぐため、
+  // 厳密には自分が押しているときは最低でも (フェッチ数 + 1) か、もしフェッチ数が0なら 1 になるようにします）
+  const displayCount = isLocalStorageActive 
+    ? Math.max(totalFetchedCount, 1) + (totalFetchedCount === 0 ? 0 : 0) // 自分のローカル分を確実に反映
+    : totalFetchedCount;
+
+  // 上記の計算をさらにシンプルかつ確実にします：
+  // 自分がリアクションしている場合：リレーから取れた数に（もし自分の分がまだリレーに含まれていなさそうなら）+1 する、あるいはシンプルに base + 1
+  // ここでは分かりやすく「未リアクションなら fetchedCount、リアクション済みなら fetchedCount + 1（ただし最低1）」にします。
+  const finalDisplayCount = isLocalStorageActive 
+    ? (totalFetchedCount === 0 ? 1 : totalFetchedCount + 1) 
+    : totalFetchedCount;
 
   useEffect(() => {
     if (profileCache[post.pubkey]) {
@@ -462,7 +470,7 @@ export function PostCard({ post, mode }: PostCardProps) {
                   🔁 <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン（未読時は ♡、押した後は 🎤 に変化） */}
+                {/* リアクションボタン */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReactionClick}
@@ -474,7 +482,7 @@ export function PostCard({ post, mode }: PostCardProps) {
                     }`}
                   >
                     <span>{myReaction ? '🎤' : '♡'}</span>
-                    <span className="text-xs font-bold">{displayCount}</span>
+                    <span className="text-xs font-bold">{finalDisplayCount}</span>
                   </button>
                 </div>
               </div>
