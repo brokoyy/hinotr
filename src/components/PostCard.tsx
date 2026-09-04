@@ -418,6 +418,13 @@ export function PostCard({ post, mode }: PostCardProps) {
     );
   };
 
+  // 全体のリアクション総数を算出（リレーからの数＋自分が押した直後のラグ補正）
+  const totalReactions = (() => {
+    const fetchedCount = post.reactions?.length || 0;
+    if (myReaction && fetchedCount === 0) return 1;
+    return fetchedCount;
+  })();
+
   const displayName = profile?.display_name || profile?.name || post.pubkey.slice(0, 8);
 
   return (
@@ -471,12 +478,14 @@ export function PostCard({ post, mode }: PostCardProps) {
                 >
                   🔁 <span>リポスト</span>
                 </button>
+                
+                {/* リアクションボタン（未選択時は ♡＋総数、選択後は 自分の絵文字＋総数） */}
                 <button
                   onClick={handleRandomReaction}
                   className="hover:text-red-500 flex items-center gap-1.5"
                 >
                   <span>{myReaction ? myReaction : '♡'}</span>
-                  <span className="text-xs">{myReaction ? '1' : ''}</span>
+                  <span className="text-xs">{totalReactions > 0 ? totalReactions : ''}</span>
                 </button>
               </div>
 
