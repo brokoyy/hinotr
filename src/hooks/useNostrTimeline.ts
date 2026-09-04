@@ -123,7 +123,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // タイムラインの取得（Kind 1 取得後に対応するリアクション Kind 7 を別クエリで取得）
+  // タイムラインの取得（Kind 1 取得後に対応するリアクション Kind 7 を取得）
   useEffect(() => {
     let isMounted = true;
     if (!pubkey || follows.length === 0) return;
@@ -158,16 +158,16 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
             ? rawPosts.filter((post) => currentTime - post.created_at < 600)
             : rawPosts;
 
-          const postIds = processedEvents.map((p) => p.id);
+          const postIds = new Set(processedEvents.map((p) => p.id));
 
-          // 取得した投稿に対するリアクション (Kind 7) を取得
+          // リアクション (Kind 7) を取得（タグ指定なしで直近のKind 7を取得し、JS側で紐付け）
           let rawReactions: NostrEvent[] = [];
-          if (postIds.length > 0) {
+          if (postIds.size > 0) {
             try {
               rawReactions = (await pool.querySync(relays, {
                 kinds: [7],
-                '#e': postIds,
-              } as any)) as NostrEvent[];
+                limit: 500,
+              })) as NostrEvent[];
             } catch (err) {
               console.error('リアクション取得エラー:', err);
             }
@@ -176,7 +176,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           const postsWithReactions = processedEvents.map((post) => {
             const reactions = rawReactions.filter((r) => {
               const eTag = r.tags.find((t) => t[0] === 'e');
-              return eTag && eTag[1] === post.id;
+              return eTag && postIds.has(eTag[1]) && eTag[1] === post.id;
             });
             return { ...post, reactions };
           });
