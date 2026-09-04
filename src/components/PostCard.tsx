@@ -28,10 +28,8 @@ const IMAGE_REGEX = /(https?:\/\/[^\s]+?\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s]*)?
 const VIDEO_REGEX = /(https?:\/\/[^\s]+?\.(?:mp4|webm|mov)(?:\?[^\s]*)?)/gi;
 const GENERAL_URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 
-// Nostr ビーコン (nevent1, note1, nprofile1 等) を検出する正規表現
 const NOSTR_BEACON_REGEX = /(nostr:)?(nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+)/gi;
 
-// tags から client タグを抽出するヘルパー
 const getClientName = (tags: string[][]) => {
   const clientTag = tags?.find((tag) => tag[0] === 'client');
   return clientTag ? clientTag[1] : null;
@@ -100,7 +98,6 @@ function LinkCard({ url }: { url: string }) {
   );
 }
 
-// 引用された Nostr 投稿をカードとして表示するコンポーネント
 function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   const [targetEvent, setTargetEvent] = useState<NostrEvent | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -233,6 +230,16 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   });
 
+  // リアクションのカウント（自分が押している場合は最低1、あるいはローカルで管理）
+  const [reactionCount, setReactionCount] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(`hinotr_reaction_${post.id}`);
+      return saved !== null ? 1 : 0;
+    } catch {
+      return 0;
+    }
+  });
+
   useEffect(() => {
     if (profileCache[post.pubkey]) {
       setProfile(profileCache[post.pubkey]);
@@ -275,6 +282,7 @@ export function PostCard({ post, mode }: PostCardProps) {
     const randomContent = reactions[Math.floor(Math.random() * reactions.length)];
 
     setMyReaction(randomContent);
+    setReactionCount((prev) => (myReaction ? prev : prev + 1));
     try {
       localStorage.setItem(`hinotr_reaction_${post.id}`, randomContent);
     } catch {}
@@ -295,6 +303,7 @@ export function PostCard({ post, mode }: PostCardProps) {
     } catch (e) {
       console.error('リアクション失敗:', e);
       setMyReaction(null);
+      setReactionCount((prev) => Math.max(0, prev - 1));
       try {
         localStorage.removeItem(`hinotr_reaction_${post.id}`);
       } catch {}
@@ -418,13 +427,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     );
   };
 
-  // 全体のリアクション総数を算出（リレーからの数＋自分が押した直後のラグ補正）
-  const totalReactions = (() => {
-    const fetchedCount = post.reactions?.length || 0;
-    if (myReaction && fetchedCount === 0) return 1;
-    return fetchedCount;
-  })();
-
   const displayName = profile?.display_name || profile?.name || post.pubkey.slice(0, 8);
 
   return (
@@ -479,13 +481,13 @@ export function PostCard({ post, mode }: PostCardProps) {
                   🔁 <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン（未選択時は ♡＋総数、選択後は 自分の絵文字＋総数） */}
+                {/* リアクションボタン */}
                 <button
                   onClick={handleRandomReaction}
                   className="hover:text-red-500 flex items-center gap-1.5"
                 >
                   <span>{myReaction ? myReaction : '♡'}</span>
-                  <span className="text-xs">{totalReactions > 0 ? totalReactions : ''}</span>
+                  <span className="text-xs">{reactionCount > 0 ? reactionCount : ''}</span>
                 </button>
               </div>
 
