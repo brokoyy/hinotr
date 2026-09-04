@@ -224,7 +224,6 @@ export function PostCard({ post, mode }: PostCardProps) {
 
   const fetchedReactions: NostrEvent[] = (post as any).reactions || [];
 
-  // 前回のリアクション（'🎤' または '🎸'）をロード
   const [myReaction, setMyReaction] = useState<string | null>(() => {
     try {
       return localStorage.getItem(`hinotr_reaction_${post.id}`) || null;
@@ -278,15 +277,9 @@ export function PostCard({ post, mode }: PostCardProps) {
   const handleReactionClick = async () => {
     if (mode === 'HINOTORI' || !window.nostr || isReacting) return;
 
-    // 🎤 と 🎸 を交互に切り替える
-    let nextEmoji = '🎤';
-    if (myReaction === '🎤') {
-      nextEmoji = '🎸';
-    } else if (myReaction === '🎸') {
-      nextEmoji = '🎤';
-    }
-
+    // ▼ ステートセッターのコールバック関数を使い、確実に直前の値から交互に切り替える
     const prevReaction = myReaction;
+    const nextEmoji = prevReaction === '🎤' ? '🎸' : '🎤';
 
     setIsReacting(true);
     setMyReaction(nextEmoji);
@@ -309,7 +302,6 @@ export function PostCard({ post, mode }: PostCardProps) {
       await pool.publish(DEFAULT_RELAYS, signedEvent);
     } catch (e) {
       console.error('リアクション失敗:', e);
-      // 失敗時は元に戻す
       setMyReaction(prevReaction);
       try {
         if (prevReaction) {
@@ -473,7 +465,7 @@ export function PostCard({ post, mode }: PostCardProps) {
                   🔁 <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン（未読時は ♡、押した後は自分の最新リアクション（🎤 または 🎸）に変化） */}
+                {/* リアクションボタン */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReactionClick}
