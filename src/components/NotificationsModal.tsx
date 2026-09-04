@@ -31,14 +31,15 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
     }
   };
 
-  const getNotificationBadge = (kind: number) => {
+  const getNotificationBadge = (kind: number, count?: number) => {
+    const cnt = count && count > 1 ? ` ${count}` : '';
     switch (kind) {
       case 1:
         return { icon: '💬', label: 'リプライ', color: 'text-blue-500 bg-blue-500/10' };
       case 6:
-        return { icon: '🔄', label: 'リポスト', color: 'text-green-500 bg-green-500/10' };
+        return { icon: '🔁', label: `リポスト${cnt}`, color: 'text-green-500 bg-green-500/10' };
       case 7:
-        return { icon: '❤️', label: 'リアクション', color: 'text-pink-500 bg-pink-500/10' };
+        return { icon: '♡', label: `リアクション${cnt}`, color: 'text-pink-500 bg-pink-500/10' };
       default:
         return { icon: '✨', label: `Kind ${kind}`, color: 'text-orange-500 bg-orange-500/10' };
     }
@@ -46,15 +47,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
   const parseNotificationContent = (item: NotificationItem) => {
     if (item.kind === 6) {
-      try {
-        const parsed = JSON.parse(item.content);
-        if (parsed && typeof parsed.content === 'string') {
-          return {
-            text: parsed.content,
-            note: 'あなたの投稿をリポストしました',
-          };
-        }
-      } catch {}
+      return { text: '', note: null }; // リポストはテキストではなく数でスッキリ見せる
     }
     return {
       text: item.content,
@@ -102,7 +95,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
           )}
 
           {notifications.map((item) => {
-            const badge = getNotificationBadge(item.kind);
+            const badge = getNotificationBadge(item.kind, item.count);
             const parsed = parseNotificationContent(item);
             const profile = item.userProfile;
 
@@ -117,7 +110,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
               >
                 {/* ヘッダー情報（バッジ ＆ 送信者アイコン・名前） */}
                 <div className="flex items-center justify-between text-xs">
-                  <span className={`px-2 py-0.5 rounded-full font-semibold flex items-center gap-1 ${badge.color}`}>
+                  <span className={`px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1 ${badge.color}`}>
                     <span>{badge.icon}</span>
                     <span>{badge.label}</span>
                   </span>
@@ -136,25 +129,23 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                     <span className="font-medium opacity-90 truncate max-w-[120px]">
                       {profile?.display_name || profile?.name || formatPubkey(item.pubkey)}
                     </span>
+                    {item.count && item.count > 1 && (
+                      <span className="text-[10px] opacity-60 font-mono">他</span>
+                    )}
                   </div>
                 </div>
 
-                {/* メインの通知コンテンツ */}
-                <div>
-                  {parsed.note && (
-                    <div className="text-[11px] opacity-60 mb-1 font-medium">
-                      {parsed.note}
-                    </div>
-                  )}
+                {/* メインの通知コンテンツ（リプライの場合のみテキスト表示） */}
+                {item.kind === 1 && parsed.text && (
                   <p className="text-sm whitespace-pre-wrap break-words opacity-90 font-medium">
-                    {parsed.text || (item.kind === 7 ? '👍 リアクションしました' : '(コンテンツなし)')}
+                    {parsed.text}
                   </p>
-                </div>
+                )}
 
                 {/* 対象となった元の自分の投稿（引用風カード） */}
                 {item.targetEvent && (
                   <div
-                    className={`mt-2 p-2.5 rounded-lg border text-xs space-y-1 ${
+                    className={`mt-1 p-2.5 rounded-lg border text-xs space-y-1 ${
                       isDark
                         ? 'bg-black/30 border-white/10 text-gray-300'
                         : 'bg-white border-gray-200 text-gray-700 shadow-2xs'
