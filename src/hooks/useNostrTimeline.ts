@@ -167,7 +167,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
               rawReactions = (await pool.querySync(relays, {
                 kinds: [7],
                 '#e': postIds,
-              })) as NostrEvent[];
+              } as any)) as NostrEvent[];
             } catch (err) {
               console.error('リアクション取得エラー:', err);
             }
