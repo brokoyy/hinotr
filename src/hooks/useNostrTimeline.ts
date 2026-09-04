@@ -160,14 +160,14 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
           const postIds = new Set(processedEvents.map((p) => p.id));
 
-          // リアクション (Kind 7) を取得（タグ指定なしで直近のKind 7を取得し、JS側で紐付け）
+          // リアクション (Kind 7) を取得（クエリ全体を as any でキャスト）
           let rawReactions: NostrEvent[] = [];
           if (postIds.size > 0) {
             try {
               rawReactions = (await pool.querySync(relays, {
                 kinds: [7],
                 limit: 500,
-              })) as NostrEvent[];
+              } as any)) as NostrEvent[];
             } catch (err) {
               console.error('リアクション取得エラー:', err);
             }
