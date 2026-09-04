@@ -1,14 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Theme } from '../types/nostr';
 
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
   theme: Theme;
-  pubkey?: string | null; // ユーザーごとに履歴を分けるためのpubkey（任意）
+  pubkey?: string | null;
 }
 
-const EMOJI_CATEGORIES = [
+interface Category {
+  name: string;
+  icon: string;
+  emojis?: string[];
+  isFrequent?: boolean;
+}
+
+// 豊富な絵文字データを網羅したカテゴリ一覧
+const EMOJI_CATEGORIES: Category[] = [
   {
     name: 'よく使う',
     icon: '🕒',
@@ -17,46 +25,108 @@ const EMOJI_CATEGORIES = [
   {
     name: '顔・感情',
     icon: '😀',
-    emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮‍💨', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '🤯', '🤠', '🥳', '😎', '🤓', '🧐'],
+    emojis: [
+      '😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '🙃', '😉', '😊', '😇', '🥰', '😍', '🤩', 
+      '😘', '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', 
+      '😐', '😑', '😶', '😏', '😒', '🙄', '😬', '😮‍💨', '🤥', '😌', '😔', 'ss', '😪', '🤤', '😴', '😷', 
+      '🤒', '🤕', '🤢', '🤮', '🤧', '🥵', '🥶', '🥴', '😵', '😵‍💫', '🤯', '🤠', '🥳', '😎', '🤓', '🧐', 
+      '😕', '😟', '🙁', '☹️', 'オープ', '😮', '😯', '😲', '🥱', '😴', '🤤', '😪', 'ᯓ', '😳', '🥺', '', 
+      'frown', '😦', '😧', '😨', '😰', '😥', '😢', '😭', '😱', '😖', '😣', '😞', '😓', '😩', '😫', '🥱', 
+      '😤', '😡', '😠', '🤬', '😈', '👿', '💀', '☠️', '💩', '🤡', '👹', '👺', '👻', '👽', '👾', '🤖', 
+      '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿', '😾'
+    ],
+  },
+  {
+    name: '人物・身体',
+    icon: '👋',
+    emojis: [
+      '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉', 
+      '👆', '🖕', '👇', '☝️', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🫶', '👐', '🤲', '🤝', 
+      '🙏', '✍️', '💅', '🤳', '💪', '🦾', '🦿', '🦵', '🦶', '👂', '🦻', '👃', '🧠', '🫀', '🫁', '🦷', 
+      '骨', '👀', '👁️', '👅', '👄', '💋', 'bite', '👶', '👧', '🧒', '👦', '👩', '🧑', '👨', '👩‍🦱', '👨‍🦱', 
+      '👩‍🦰', '👨‍🦰', '👱‍♀️', '👱‍♂️', '👩‍🦳', '👨‍🦳', '👩‍🦲', '👨‍🦲', '🧔', '👵', '🧓', '👴', '👲', '👳‍♀️', '👳‍♂️', '🧕', 
+      '👮‍♀️', '👮‍♂️', '👷‍♀️', '👷‍♂️', '💂‍♀️', '💂‍♂️', '🕵️‍♀️', '🕵️‍♂️', '👩‍⚕️', '👨‍⚕️', '👩‍🌾', '👨‍🌾', '👩‍🍳', '👨‍🍳', '👩‍🎓', '👨‍🎓', 
+      '👩‍🎤', '👨‍🎤', '👩‍🏫', '👨‍🏫', '👩‍🏭', '👨‍🏭', '👩‍💻', '👨‍💻', '👩‍💼', '👨‍💼', '👩‍🔧', '👨‍🔧', '👩‍🔬', '👨‍🔬', '👩‍🎨', '👨‍🎨', 
+      '👩‍🚒', '👨‍🚒', '👩‍✈️', '👨‍✈️', '👩‍🚀', '👨‍🚀', '👩‍⚖️', '👨‍⚖️', '👰‍♀️', '👰‍♂️', '🤵‍♀️', '🤵‍♂️', '👸', '🤴', '🥷', '🦸‍♀️'
+    ],
   },
   {
     name: '動物・自然',
     icon: '🐶',
-    emojis: ['🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐸', '🐵', '🐔', '🐧', '🐦', '🐤', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', '🐴', '🦄', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🪰', '🪲', '🪳', '🦟', '🦗', '🕷️', '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', '🐋', '🦈', '🐊', '🐅', '🐆'],
+    emojis: [
+      '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐷', '🐽', '🐸', '🐵', 
+      '🙈', '🙉', '🙊', '🐒', '🐔', '🐧', '🐦', '🐤', '🐣', '🐥', '🦆', '🦅', '🦉', '🦇', '🐺', '🐗', 
+      '🐴', '🦄', '🐝', '🪱', '🐛', '🦋', '🐌', '🐞', '🐜', '🪰', '🪲', '🪳', '🦟', '🦗', '🕷️', '🕸️', 
+      '🦂', '🐢', '🐍', '🦎', '🦖', '🦕', '🐙', '🦑', '🦐', '🦞', '🦀', '🐡', '🐠', '🐟', '🐬', '🐳', 
+      '🐋', '🦈', '🐊', '🐅', '🐆', '🦓', '🦍', '🧧', '🐘', '🦛', '🦏', '🐪', '🐫', '🦒', '🦘', '🐃', 
+      '🐂', '🐄', '🐎', '🐖', '🐏', '🐑', '🦙', '🐐', '🦌', '🐕', '🐩', '🦮', '🐕‍🦺', '🐈', '🐈‍⬛', '🪶', 
+      '🐓', '🦃', '🦤', '🦚', '🦜', '🦢', '🦩', '🕊️', '🐇', '🦝', '🦨', '🦡', '🦫', '🦦', '🦥', '🐁'
+    ],
   },
   {
-    name: '食べ物',
+    name: '食べ物・飲み物',
     icon: '🍎',
-    emojis: ['🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🍳', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '🍔', '🍟', '🍕', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔', '🥗', '🥘', '🫕'],
+    emojis: [
+      '🍏', '🍎', '🍐', '🍊', '🍋', '🍌', '🍉', '🍇', '🍓', '🫐', '🍈', '🍒', '🍑', '🥭', '🍍', '🥥', 
+      '🥝', '🍅', '🍆', '🥑', '🥦', '🥬', '🥒', '🌶️', '🫑', '🌽', '🥕', '🫒', '🧄', '🧅', '🥔', '🍠', 
+      '🥐', '🥯', '🍞', '🥖', '🥨', '🧀', '🍳', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🦴', '핫도그', '🍔', 
+      '🍟', '🍕', '🥪', '🥙', '🧆', '🌮', '🌯', '🫔', '🥗', '🥘', '🫕', '罐', '🥫', '🍝', '🍜', '🍲', 
+      '🍛', '🍣', '寿司', '🍱', '🥟', '🦪', '🍤', '🍙', '🍚', '🍘', '🍥', '🥠', '🥮', '🍢', '🍡', '🍧', 
+      '🍨', '🍦', '🥧', '🧁', '🍰', '🎂', '🍮', '🍭', 'キャンディ', '🍫', '🍿', '🍩', '🍪', '🌰', '🍯', '🥛', 
+      '🍼', '🫖', '🍵', '☕', '🧃', '🧉', '🍾', '🍷', '🍸', '🍹', '🍺', '🍻', '🥂', '🥃', '🥤', '🧋', '🧊'
+    ],
   },
   {
     name: 'アクティビティ',
     icon: '⚽',
-    emojis: ['⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '⛸️', '🥌', '🎿', '⛷️', '🏂', '🪂', '🏋️‍♀️', '🤼‍♀️', '🤸‍♀️', '⛹️‍♀️', '🤺', '🤾‍♀️', '🏌️‍♀️'],
+    emojis: [
+      '⚽', '🏀', '🏈', '⚾', '🥎', '🎾', '🏐', '🏉', '🥏', '🎱', '🪀', '🏓', '🏸', '🏒', '🏑', '🥍', 
+      '🏏', '🪃', '🥅', '⛳', '🪁', '🏹', '🎣', '🤿', '🥊', '🥋', '🎽', '🛹', '🛼', '🛷', '⛸️', '🥌', 
+      '🎿', '⛷️', '🏂', '🪂', '🏋️‍♀️', '🏋️‍♂️', '🤼‍♀️', '🤼‍♂️', '🤸‍♀️', '🤸‍♂️', '⛹️‍♀️', '⛹️‍♂️', '🤺', '🤾‍♀️', '🤾‍♂️', '🏌️‍♀️', 
+      '🏌️‍♂️', '🏇', '🧘‍♀️', '🧘‍♂️', '🏄‍♀️', '🏄‍♂️', '🏊‍♀️', '🏊‍♂️', '🤽‍♀️', '🤽‍♂️', '🚣‍♀️', '🚣‍♂️', '🧗‍♀️', '🧗‍♂️', '🚴‍♀️', '🚴‍♂️', 
+      '🚵‍♀️', '🚵‍♂️', '🎪', '🛹', '🛼', '🎭', '🎨', '🎬', '🎤', '🎧', '🎼', '🎹', '🥁', '🎷', '🎺', '🎸', '🪕', '🎻'
+    ],
   },
   {
-    name: '乗り物',
+    name: '旅行・乗り物',
     icon: '🚗',
-    emojis: ['🚗', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🛵', '🏍️', '🛺', '🚲', '🛴', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟', '🚃', '🚋', '🚝', '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚉'],
+    emojis: [
+      '🚗', 'タクシー', '🚙', '🚌', '🚎', '🏎️', '🚓', '🚑', '🚒', '🚐', '🛻', '🚚', '🚛', '🚜', '🛵', '🏍️', 
+      '🛺', '🚲', '🛴', '🦽', '🦼', '🚨', '🚔', '🚍', '🚘', '🚖', '🚡', '🚠', '🚟', '🚃', '🚋', '🚝', 
+      '🚄', '🚅', '🚈', '🚂', '🚆', '🚇', '🚊', '🚉', '✈️', '🛫', '🛬', '🛩️', '💺', '🛰️', '🚀', '🛸', 
+      '🚁', '🛶', '⛵', '🚤', '🛥️', '🚢', '🛟', '⚓', '🪝', '⛽', 'construction', '🚦', '🚥', '🚏', '🗺️', '🗿', 
+      '🗽', '🗼', '🏰', '🏯', '🏟️', '🎡', '🎢', '🎠', '⛲', '⛱️', '🏖️', '🏝️', '🏜️', '🌋', '⛰️', '🏔️', '🗻'
+    ],
   },
   {
-    name: 'シンボル・その他',
+    name: 'オブジェクト・記号',
     icon: '💡',
-    emojis: ['💡', '🔦', '🏮', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '🪙', '💰', '💳', '💎', '⚖️', '🧰', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '🪤', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨', '🪓', '🔪', '🗡️', '⚔️', '🛡️', '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🚪', '🛏️', '🛋️', '🚽', '🚿', '🛁', '🪞', '🪟'],
+    emojis: [
+      '💡', '🔦', '🏮', '🪔', '🧯', '🛢️', '💸', '💵', '💴', '💶', '💷', '🪙', '💰', '💳', '💎', '⚖️', 
+      '🧰', '🔧', '🔨', '⚒️', '🛠️', '⛏️', '🪚', '🔩', '⚙️', '🪤', '🧱', '⛓️', '🧲', '🔫', '💣', '🧨', 
+      '🪓', '🔪', '🗡️', '⚔️', '🛡️', '🚬', '⚰️', '🪦', '⚱️', '🏺', '🔮', '📿', '🧿', '💈', '⚗️', '🔭', 
+      '🔬', '🕳️', '🩹', '🩺', '💊', '💉', '🚪', '🛏️', '🛋️', '🚽', '🚿', '🛁', '🪞', '🪟', '🛍️', '🛒', 
+      '🎈', '🎉', '🎊', '🎁', '🎀', '🪅', '🪩', '🧧', '✉️', '📩', '📨', '📧', '💌', '📥', '📤', '📦', '🏷️', 
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', 
+      '💘', '💝', '💤', '💢', '💬', '💭', '💤', '💯', '🔥', '✨', '⭐', '🌟', '💫', '💥', 'et'
+    ],
   }
 ];
 
 const STORAGE_KEY_PREFIX = 'hinotr_frequent_emojis_';
-const DEFAULT_FREQUENT = ['😆', '👏', '👍', '👀', '😀', '✨', '😍', '😘', '☀️', '😂', '😜', '🎂', '🤣', '😅', '🤯', '🎉', '🅱️', '💡', '👑', '🫣', '✊', '👻', '😇', '💪', '🙌', '😌', '😭'];
+const DEFAULT_FREQUENT: string[] = []; // 最初は空にして使いながら自動で溜めていく
 
 export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, theme, pubkey }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [frequentEmojis, setFrequentEmojis] = useState<string[]>(DEFAULT_FREQUENT);
-  const isDark = theme === 'dark';
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const categoryRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const isInternalScrolling = useRef(false);
 
+  const isDark = theme === 'dark';
   const storageKey = `${STORAGE_KEY_PREFIX}${pubkey || 'default'}`;
 
-  // マウント時にローカルストレージからよく使う絵文字の履歴を読み込む
+  // 履歴の読み込み
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey);
@@ -68,28 +138,54 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, the
         }
       }
     } catch {}
-    // 保存データがない場合はデフォルトセット
     setFrequentEmojis(DEFAULT_FREQUENT);
   }, [storageKey]);
 
-  // 絵文字が選ばれたときの処理（使用回数をカウント・並び替えして保存）
+  // 絵文字選択時
   const handleEmojiClick = (emoji: string) => {
     onSelect(emoji);
-
     setFrequentEmojis((prev) => {
-      // 既存リストから除外して先頭に追加、最大28個（4行分）まで保持
       const updated = [emoji, ...prev.filter((e) => e !== emoji)].slice(0, 28);
       try {
         localStorage.setItem(storageKey, JSON.stringify(updated));
       } catch {}
       return updated;
     });
-
     onClose();
   };
 
-  const currentCategory = EMOJI_CATEGORIES[activeTab];
-  const displayEmojis = currentCategory.isFrequent ? frequentEmojis : (currentCategory.emojis || []);
+  // タブをクリックしたとき、該当カテゴリの場所までスムーズにスクロールする
+  const handleTabClick = (idx: number) => {
+    setActiveTab(idx);
+    const targetEl = categoryRefs.current[idx];
+    if (targetEl && scrollContainerRef.current) {
+      isInternalScrolling.current = true;
+      targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => {
+        isInternalScrolling.current = false;
+      }, 300);
+    }
+  };
+
+  // スクロール位置に応じて自動でアクティブなタブを切り替える
+  const handleScroll = () => {
+    if (isInternalScrolling.current) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const containerTop = container.getBoundingClientRect().top;
+    
+    let currentIdx = 0;
+    categoryRefs.current.forEach((el, idx) => {
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.top - containerTop <= 40) {
+          currentIdx = idx;
+        }
+      }
+    });
+    setActiveTab(currentIdx);
+  };
 
   return (
     <div
@@ -98,15 +194,16 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, the
       }`}
     >
       {/* カテゴリタブアイコン */}
-      <div className={`flex items-center justify-around px-2 py-2 border-b ${isDark ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+      <div className={`flex items-center justify-around px-1 py-2 border-b ${isDark ? 'bg-gray-900/50 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
         {EMOJI_CATEGORIES.map((cat, idx) => (
           <button
             key={cat.name}
-            onClick={() => setActiveTab(idx)}
+            type="button"
+            onClick={() => handleTabClick(idx)}
             title={cat.name}
-            className={`p-2 rounded-xl text-lg transition ${
+            className={`p-1.5 rounded-xl text-base transition ${
               activeTab === idx
-                ? (isDark ? 'bg-gray-700 text-white font-bold' : 'bg-gray-200 text-gray-900 font-bold shadow-2xs')
+                ? (isDark ? 'bg-gray-700 text-white font-bold scale-110' : 'bg-gray-200 text-gray-900 font-bold shadow-2xs scale-110')
                 : 'opacity-60 hover:opacity-100'
             }`}
           >
@@ -115,19 +212,40 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose, the
         ))}
       </div>
 
-      {/* 絵文字グリッドエリア */}
-      <div className="p-3 max-h-56 overflow-y-auto grid grid-cols-7 gap-1">
-        {displayEmojis.map((emoji, index) => (
-          <button
-            key={index}
-            onClick={() => handleEmojiClick(emoji)}
-            className={`h-9 w-9 flex items-center justify-center text-xl rounded-xl transition ${
-              isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-            }`}
-          >
-            {emoji}
-          </button>
-        ))}
+      {/* スクロール可能な全絵文字リストエリア */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="p-3 h-60 overflow-y-auto space-y-4 scroll-smooth"
+      >
+        {EMOJI_CATEGORIES.map((cat, idx) => {
+          const emojisToDisplay = cat.isFrequent ? frequentEmojis : (cat.emojis || []);
+
+          return (
+            <div
+              key={cat.name}
+              ref={(el) => { categoryRefs.current[idx] = el; }}
+            >
+              <div className="text-[11px] font-bold text-gray-400 dark:text-gray-500 mb-1.5 px-1">
+                {cat.name}
+              </div>
+              <div className="grid grid-cols-7 gap-1">
+                {emojisToDisplay.map((emoji, eIdx) => (
+                  <button
+                    key={eIdx}
+                    type="button"
+                    onClick={() => handleEmojiClick(emoji)}
+                    className={`h-8 w-8 flex items-center justify-center text-lg rounded-lg transition ${
+                      isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
