@@ -20,17 +20,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const isDark = theme === 'dark';
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 max-w-md w-full shadow-xl text-gray-900 dark:text-gray-100 space-y-6">
         <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3">
           <h2 className="text-xl font-bold">⚙️ 設定</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-            ✕
+          <button
+            onClick={onClose}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+              isDark
+                ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+            }`}
+          >
+            閉じる
           </button>
         </div>
 
-        {/* ★ テーマ切り替えセクションを追加 */}
+        {/* テーマ切り替えセクション */}
         <div className="space-y-3">
           <h3 className="font-semibold text-sm text-gray-500 dark:text-gray-400">テーマ設定</h3>
           <button
@@ -38,7 +47,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             className="w-full py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs font-bold flex items-center justify-between transition"
           >
             <span>表示モード</span>
-            <span>{theme === 'light' ? '☀️ ライトモード (Light)' : '🌙 ダークモード (Dark)'}</span>
+            <span>{theme === 'light' ? '☀️ Light' : '🌙 Dark'}</span>
           </button>
         </div>
 
