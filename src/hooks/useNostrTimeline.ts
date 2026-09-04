@@ -164,10 +164,15 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           let rawReactions: NostrEvent[] = [];
           if (postIds.size > 0) {
             try {
-              rawReactions = (await pool.querySync(relays, {
+              // nostr-tools の厳密な Filter 型に合わせてキャスト
+              const reactionFilter = {
                 kinds: [7],
                 limit: 500,
-              } as any)) as NostrEvent[];
+              };
+              rawReactions = (await pool.querySync(
+                relays,
+                reactionFilter as unknown as Parameters<typeof pool.querySync>[1]
+              )) as NostrEvent[];
             } catch (err) {
               console.error('リアクション取得エラー:', err);
             }
