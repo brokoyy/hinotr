@@ -140,7 +140,6 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
         if (event && isMounted) {
           setTargetEvent(event);
 
-          // 投稿者のプロフィールも取得
           if (profileCache[event.pubkey]) {
             setProfile(profileCache[event.pubkey]);
           } else {
@@ -172,7 +171,7 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
 
   if (loading) {
     return (
-      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs opacity-50 animate-pulse">
+      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 text-xs opacity-50 animate-pulse">
         引用投稿を読み込み中... ({beacon.slice(0, 16)}...)
       </div>
     );
@@ -180,7 +179,7 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
 
   if (!targetEvent) {
     return (
-      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5 text-xs opacity-60 font-mono">
+      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/60 text-xs opacity-60 font-mono">
         引用投稿が見つかりませんでした ({beacon})
       </div>
     );
@@ -189,7 +188,7 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   const displayName = profile?.display_name || profile?.name || targetEvent.pubkey.slice(0, 8);
 
   return (
-    <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/80 dark:bg-white/5 text-xs space-y-2">
+    <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-slate-900/80 text-xs space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {profile?.picture ? (
