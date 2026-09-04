@@ -45,6 +45,7 @@ export function useNostrNotifications(pubkey: string | null) {
           if (event.pubkey === pubkey) return;
 
           setRawEvents((prev) => {
+            // 既に同じIDのイベントがあれば追加しない
             if (prev.some((n) => n.id === event.id)) return prev;
             return [event, ...prev];
           });
@@ -87,29 +88,34 @@ export function useNostrNotifications(pubkey: string | null) {
   const notifications = useMemo(() => {
     const map = new Map<string, NotificationItem>();
 
-    // 時系列順に処理するため一度ソート
-    const sorted = [...rawEvents].sort((a, b) => b.created_at - a.created_at);
+    // 古いものから新しいものへ順に処理していくことで、カウントを正しく積み上げる
+    const sorted = [...rawEvents].sort((a, b) => a.created_at - b.created_at);
 
     for (const event of sorted) {
       const targetEventId = event.tags.find((tag) => tag[0] === 'e')?.[1];
 
-      // リポスト(6) または リアクション(7) でターゲットがある場合はグループ化のキーを作成
+      // リポスト(6) または リアクション(7) でターゲットがある場合は、
+      // 「Kind + ターゲットID」をキーにして同じ投稿への反応を1つにまとめる
       const isAggregatable = (event.kind === 6 || event.kind === 7) && targetEventId;
       const groupKey = isAggregatable ? `${event.kind}-${targetEventId}` : `single-${event.id}`;
 
       if (map.has(groupKey)) {
         const existing = map.get(groupKey)!;
         const senders = existing.senders || [existing.pubkey];
+        
+        // まだこの送信者からの通知が追加されていなければ追加してカウントアップ
         if (!senders.includes(event.pubkey)) {
           senders.push(event.pubkey);
         }
+
         map.set(groupKey, {
           ...existing,
           count: senders.length,
           senders,
+          // より新しいイベントの日時を全体のcreated_atにする
           created_at: Math.max(existing.created_at, event.created_at),
-          targetEvent: targetEventId ? targetEvents[targetEventId] : undefined,
-          userProfile: profiles[existing.pubkey] || profiles[event.pubkey],
+          targetEvent: targetEventId ? targetEvents[targetEventId] || existing.targetEvent : undefined,
+          userProfile: profiles[event.pubkey] || existing.userProfile,
         });
       } else {
         map.set(groupKey, {
@@ -122,6 +128,7 @@ export function useNostrNotifications(pubkey: string | null) {
       }
     }
 
+    // 最終的に新しい順に並べ替えて返す
     return Array.from(map.values()).sort((a, b) => b.created_at - a.created_at);
   }, [rawEvents, targetEvents, profiles]);
 
