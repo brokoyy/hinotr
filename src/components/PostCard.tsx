@@ -232,22 +232,9 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   });
 
-  // ▼ すべてのリアクションを強制的に 1つの絵文字（例: "🎤"）にまとめて集計する！
-  // どんな絵文字や +1（空文字）が来ても、すべてひっくるめてカウントします
   const unifiedEmoji = '🎤';
-  let totalCount = fetchedReactions.length;
-
-  // もし自分がローカルでリアクションをしていて、それがまだフェッチに含まれていなければ +1
-  const hasMyReactionInFetched = fetchedReactions.some(
-    (r) => r.pubkey === (window.nostr ? /* 自分のpubkeyが取れればベストだが簡易的に判定 */ r.pubkey : '')
-  );
-  
-  // 単純に「自分がlocalstorageで押していて、かつfetchedに自分の分がまだ反映されていないかも？」を考慮
-  // ここではシンプルに fetchedReactions の総数 ＋ (自分が押してて未反映なら1) で計算
+  const totalCount = fetchedReactions.length;
   const isLocalStorageActive = !!myReaction;
-  
-  // ※フェッチ済みに自分のリアクションが含まれているか厳密に判定しなくても、
-  // 「すれ違いを防ぐため、自分が押した事実があればカウントを底上げする」形にします
   const displayCount = totalCount === 0 && isLocalStorageActive ? 1 : Math.max(totalCount, isLocalStorageActive ? 1 : 0);
 
   useEffect(() => {
@@ -304,7 +291,7 @@ export function PostCard({ post, mode }: PostCardProps) {
           ['p', post.pubkey],
           ['client', 'hinotr'],
         ],
-        content: unifiedEmoji, // 常に 🎤 で送信する
+        content: unifiedEmoji,
       };
       const signedEvent = await window.nostr.signEvent(template);
       await pool.publish(DEFAULT_RELAYS, signedEvent);
@@ -469,7 +456,7 @@ export function PostCard({ post, mode }: PostCardProps) {
                   🔁 <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン（常に 🎤 にまとめて表示） */}
+                {/* リアクションボタン */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReactionClick}
