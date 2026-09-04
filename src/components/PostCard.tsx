@@ -221,6 +221,9 @@ export function PostCard({ post, mode }: PostCardProps) {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // 取得したリアクションデータのマッピング
+  const fetchedReactions: NostrEvent[] = (post as any).reactions || [];
+
   // リアクションの状態管理
   const [myReaction, setMyReaction] = useState<string | null>(() => {
     try {
@@ -231,33 +234,11 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   });
 
-  const [reactionCount, setReactionCount] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem(`hinotr_reaction_${post.id}`);
-      return saved !== null ? 1 : 0;
-    } catch {
-      return 0;
-    }
-  });
-
-  // リポストの状態管理
-  const [hasReposted, setHasReposted] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(`hinotr_repost_${post.id}`);
-      return saved === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  const [repostCount, setRepostCount] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem(`hinotr_repost_${post.id}`);
-      return saved === 'true' ? 1 : 0;
-    } catch {
-      return 0;
-    }
-  });
+  // 取得できたリアクション数（+ローカルで押した分）
+  const totalReactionCount = Math.max(
+    fetchedReactions.length,
+    myReaction ? 1 : 0
+  );
 
   useEffect(() => {
     if (profileCache[post.pubkey]) {
@@ -301,7 +282,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     const randomContent = reactions[Math.floor(Math.random() * reactions.length)];
 
     setMyReaction(randomContent);
-    setReactionCount((prev) => (myReaction ? prev : prev + 1));
     try {
       localStorage.setItem(`hinotr_reaction_${post.id}`, randomContent);
     } catch {}
@@ -322,43 +302,8 @@ export function PostCard({ post, mode }: PostCardProps) {
     } catch (e) {
       console.error('リアクション失敗:', e);
       setMyReaction(null);
-      setReactionCount((prev) => Math.max(0, prev - 1));
       try {
         localStorage.removeItem(`hinotr_reaction_${post.id}`);
-      } catch {}
-    }
-  };
-
-  const handleRepost = async () => {
-    if (mode === 'HINOTORI' || !window.nostr) return;
-    if (hasReposted) return; // すでにリポスト済みの場合は二重実行しない
-    if (!confirm('この投稿をリポストしますか？')) return;
-
-    setHasReposted(true);
-    setRepostCount((prev) => prev + 1);
-    try {
-      localStorage.setItem(`hinotr_repost_${post.id}`, 'true');
-    } catch {}
-
-    try {
-      const template = {
-        kind: 6,
-        created_at: Math.floor(Date.now() / 1000),
-        tags: [
-          ['e', post.id, '', 'mention'],
-          ['p', post.pubkey],
-          ['client', 'hinotr'],
-        ],
-        content: JSON.stringify(post),
-      };
-      const signedEvent = await window.nostr.signEvent(template);
-      await pool.publish(DEFAULT_RELAYS, signedEvent);
-    } catch (e) {
-      console.error('リポスト失敗:', e);
-      setHasReposted(false);
-      setRepostCount((prev) => Math.max(0, prev - 1));
-      try {
-        localStorage.removeItem(`hinotr_repost_${post.id}`);
       } catch {}
     }
   };
@@ -506,15 +451,12 @@ export function PostCard({ post, mode }: PostCardProps) {
                   💬 <span>返信</span>
                 </button>
                 
-                {/* リポストボタン（未リポスト時は 🔁 のみ、リポスト後は緑色＋総数） */}
+                {/* リポストボタン（元のシンプルな形に戻しました） */}
                 <button
-                  onClick={handleRepost}
-                  className={`flex items-center gap-1.5 ${
-                    hasReposted ? 'text-green-500 font-bold' : 'hover:text-green-500'
-                  }`}
+                  onClick={() => confirm('この投稿をリポストしますか？') && alert('リポスト機能は調整中です')}
+                  className="hover:text-green-500 flex items-center gap-1"
                 >
-                  <span>🔁</span>
-                  <span className="text-xs">{repostCount > 0 ? repostCount : ''}</span>
+                  🔁 <span>リポスト</span>
                 </button>
                 
                 {/* リアクションボタン */}
@@ -523,7 +465,7 @@ export function PostCard({ post, mode }: PostCardProps) {
                   className="hover:text-red-500 flex items-center gap-1.5"
                 >
                   <span>{myReaction ? myReaction : '♡'}</span>
-                  <span className="text-xs">{reactionCount > 0 ? reactionCount : ''}</span>
+                  <span className="text-xs">{totalReactionCount > 0 ? totalReactionCount : ''}</span>
                 </button>
               </div>
 
