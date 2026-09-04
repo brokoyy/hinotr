@@ -171,7 +171,10 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
 
   if (loading) {
     return (
-      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-500 dark:text-slate-400 animate-pulse">
+      <div 
+        className="my-2 p-3 rounded-xl text-xs animate-pulse"
+        style={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#94a3b8', borderWidth: '1px' }}
+      >
         引用投稿を読み込み中... ({beacon.slice(0, 16)}...)
       </div>
     );
@@ -179,7 +182,10 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
 
   if (!targetEvent) {
     return (
-      <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-500 dark:text-slate-400 font-mono">
+      <div 
+        className="my-2 p-3 rounded-xl text-xs font-mono"
+        style={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#94a3b8', borderWidth: '1px' }}
+      >
         引用投稿が見つかりませんでした ({beacon})
       </div>
     );
@@ -188,19 +194,22 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   const displayName = profile?.display_name || profile?.name || targetEvent.pubkey.slice(0, 8);
 
   return (
-    <div className="my-2 p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 text-xs text-slate-900 dark:text-slate-100 space-y-2">
+    <div 
+      className="my-2 p-3 rounded-xl text-xs space-y-2 shadow-sm"
+      style={{ backgroundColor: '#0f172a', borderColor: '#1e293b', color: '#f8fafc', borderWidth: '1px' }}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {profile?.picture ? (
             <img src={profile.picture} alt="" className="w-5 h-5 rounded-full object-cover" />
           ) : (
-            <div className="w-5 h-5 rounded-full bg-slate-300 dark:bg-slate-700" />
+            <div className="w-5 h-5 rounded-full bg-slate-700" />
           )}
           <span className="font-bold truncate max-w-[120px]">{displayName}</span>
-          <span className="text-slate-500 dark:text-slate-400">{formatPubkey(targetEvent.pubkey)}</span>
+          <span style={{ color: '#94a3b8' }}>{formatPubkey(targetEvent.pubkey)}</span>
         </div>
       </div>
-      <p className="line-clamp-3 whitespace-pre-wrap text-slate-800 dark:text-slate-200">
+      <p className="line-clamp-3 whitespace-pre-wrap" style={{ color: '#e2e8f0' }}>
         {targetEvent.content}
       </p>
     </div>
