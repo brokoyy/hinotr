@@ -44,8 +44,14 @@ export function useNostrNotifications(pubkey: string | null) {
         onevent(event: NostrEvent) {
           if (event.pubkey === pubkey) return;
 
+          // --- デバッグログ：実際に届いたイベントとタグ構造を確認 ---
+          if (event.kind === 6 || event.kind === 7) {
+            console.log(`[Notification Debug] Kind ${event.kind} received:`, event);
+            console.log('-> eタグ一覧:', event.tags.filter(t => t[0] === 'e'));
+          }
+          // -----------------------------------------------------
+
           setRawEvents((prev) => {
-            // 既に同じIDのイベントがあれば追加しない
             if (prev.some((n) => n.id === event.id)) return prev;
             return [event, ...prev];
           });
@@ -87,32 +93,23 @@ export function useNostrNotifications(pubkey: string | null) {
   // rawEvents をもとに、Kind 6 と Kind 7 をターゲット単位でグループ化する
   const notifications = useMemo(() => {
     const map = new Map<string, NotificationItem>();
-
-    // 古いものから新しいものへ順に処理していくことで、カウントを正しく積み上げる
     const sorted = [...rawEvents].sort((a, b) => a.created_at - b.created_at);
 
     for (const event of sorted) {
       const targetEventId = event.tags.find((tag) => tag[0] === 'e')?.[1];
-
-      // リポスト(6) または リアクション(7) でターゲットがある場合は、
-      // 「Kind + ターゲットID」をキーにして同じ投稿への反応を1つにまとめる
       const isAggregatable = (event.kind === 6 || event.kind === 7) && targetEventId;
       const groupKey = isAggregatable ? `${event.kind}-${targetEventId}` : `single-${event.id}`;
 
       if (map.has(groupKey)) {
         const existing = map.get(groupKey)!;
         const senders = existing.senders || [existing.pubkey];
-        
-        // まだこの送信者からの通知が追加されていなければ追加してカウントアップ
         if (!senders.includes(event.pubkey)) {
           senders.push(event.pubkey);
         }
-
         map.set(groupKey, {
           ...existing,
           count: senders.length,
           senders,
-          // より新しいイベントの日時を全体のcreated_atにする
           created_at: Math.max(existing.created_at, event.created_at),
           targetEvent: targetEventId ? targetEvents[targetEventId] || existing.targetEvent : undefined,
           userProfile: profiles[event.pubkey] || existing.userProfile,
@@ -128,7 +125,6 @@ export function useNostrNotifications(pubkey: string | null) {
       }
     }
 
-    // 最終的に新しい順に並べ替えて返す
     return Array.from(map.values()).sort((a, b) => b.created_at - a.created_at);
   }, [rawEvents, targetEvents, profiles]);
 
