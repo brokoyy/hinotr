@@ -224,6 +224,7 @@ export function PostCard({ post, mode }: PostCardProps) {
 
   const fetchedReactions: NostrEvent[] = (post as any).reactions || [];
 
+  // 前回のリアクション（'🎤' または '🎸'）をロード
   const [myReaction, setMyReaction] = useState<string | null>(() => {
     try {
       return localStorage.getItem(`hinotr_reaction_${post.id}`) || null;
@@ -276,14 +277,21 @@ export function PostCard({ post, mode }: PostCardProps) {
 
   const handleReactionClick = async () => {
     if (mode === 'HINOTORI' || !window.nostr || isReacting) return;
-    if (myReaction) return;
 
-    const reactionEmoji = '🎤';
+    // 🎤 と 🎸 を交互に切り替える
+    let nextEmoji = '🎤';
+    if (myReaction === '🎤') {
+      nextEmoji = '🎸';
+    } else if (myReaction === '🎸') {
+      nextEmoji = '🎤';
+    }
+
+    const prevReaction = myReaction;
 
     setIsReacting(true);
-    setMyReaction(reactionEmoji);
+    setMyReaction(nextEmoji);
     try {
-      localStorage.setItem(`hinotr_reaction_${post.id}`, reactionEmoji);
+      localStorage.setItem(`hinotr_reaction_${post.id}`, nextEmoji);
     } catch {}
 
     try {
@@ -295,15 +303,20 @@ export function PostCard({ post, mode }: PostCardProps) {
           ['p', post.pubkey],
           ['client', 'hinotr'],
         ],
-        content: reactionEmoji,
+        content: nextEmoji,
       };
       const signedEvent = await window.nostr.signEvent(template);
       await pool.publish(DEFAULT_RELAYS, signedEvent);
     } catch (e) {
       console.error('リアクション失敗:', e);
-      setMyReaction(null);
+      // 失敗時は元に戻す
+      setMyReaction(prevReaction);
       try {
-        localStorage.removeItem(`hinotr_reaction_${post.id}`);
+        if (prevReaction) {
+          localStorage.setItem(`hinotr_reaction_${post.id}`, prevReaction);
+        } else {
+          localStorage.removeItem(`hinotr_reaction_${post.id}`);
+        }
       } catch {}
     } finally {
       setIsReacting(false);
@@ -460,18 +473,18 @@ export function PostCard({ post, mode }: PostCardProps) {
                   🔁 <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン */}
+                {/* リアクションボタン（未読時は ♡、押した後は自分の最新リアクション（🎤 または 🎸）に変化） */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReactionClick}
-                    disabled={!!myReaction}
+                    disabled={isReacting}
                     className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
                       myReaction 
                         ? 'border-red-500 text-red-500 bg-red-500/10' 
                         : 'border-slate-700 hover:border-slate-500 hover:text-red-500'
                     }`}
                   >
-                    <span>{myReaction ? '🎤' : '♡'}</span>
+                    <span>{myReaction ? myReaction : '♡'}</span>
                     <span className="text-xs font-bold">{finalDisplayCount}</span>
                   </button>
                 </div>
