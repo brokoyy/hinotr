@@ -29,7 +29,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_RELAYS);
       if (saved) {
-        const parsed = JSON.parse(parsed);
+        const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
@@ -72,7 +72,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey]);
 
-  // フォローリスト取得 (Kind 3) - pubkeyが変わったら必ず実行（最低限自分自身をフォロワーに入れて即座に走らせる）
+  // フォローリスト取得 (Kind 3)
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) {
@@ -109,7 +109,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // タイムラインの取得（follows が空でなくなったら、あるいは pubkey があれば即座に実行）
+  // タイムラインの取得
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) return;
@@ -117,7 +117,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const now = Math.floor(Date.now() / 1000);
     let filter: any = {};
 
-    // follows がまだ取れていない場合はいったん自分自身を対象にする
     const targetAuthors = follows.length > 0 ? follows : [pubkey];
 
     if (mode === 'PHANTOM') {
