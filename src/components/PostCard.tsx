@@ -29,6 +29,8 @@ const VIDEO_REGEX = /(https?:\/\/[^\s]+?\.(?:mp4|webm|mov)(?:\?[^\s]*)?)/gi;
 const GENERAL_URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 
 const NOSTR_BEACON_REGEX = /(nostr:)?(nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+)/gi;
+// npubを検出する正規表現
+const NPUB_REGEX = /(nostr:)?(npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+)/gi;
 
 const getClientName = (tags: string[][]) => {
   const clientTag = tags?.find((tag) => tag[0] === 'client');
@@ -254,6 +256,106 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   );
 }
 
+// ユーザー名解決用の小さなコンポーネント（本文中の npub を `@表示名` に変換する）
+function MentionTextRenderer({ text }: { text: string }) {
+  const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const matches = Array.from(text.matchAll(NPUB_REGEX));
+    if (matches.length === 0) return;
+
+    const npubList = Array.from(new Set(matches.map((m) => m[2])));
+
+    const fetchNames = async () => {
+      const newMap: Record<string, string> = {};
+      const pubkeysToFetch: string[] = [];
+      const npubToPubkey: Record<string, string> = {};
+
+      npubList.forEach((npub) => {
+        try {
+          const decoded = nip19.decode(npub);
+          if (decoded.type === 'npub') {
+            const pk = decoded.data;
+            npubToPubkey[npub] = pk;
+            if (profileCache[pk]) {
+              newMap[npub] = profileCache[pk].display_name || profileCache[pk].name || `@${npub.slice(0, 8)}...`;
+            } else {
+              pubkeysToFetch.push(pk);
+            }
+          }
+        } catch (e) {}
+      });
+
+      if (isMounted && Object.keys(newMap).length > 0) {
+        setResolvedNames((prev) => ({ ...prev, ...newMap }));
+      }
+
+      if (pubkeysToFetch.length > 0) {
+        try {
+          const events = await pool.querySync(DEFAULT_RELAYS, {
+            kinds: [0],
+            authors: pubkeysToFetch,
+          } as any);
+
+          const fetchedMap: Record<string, string> = {};
+          events.forEach((ev) => {
+            try {
+              const data = JSON.parse(ev.content);
+              const name = data.display_name || data.name;
+              const npub = nip19.npubEncode(ev.pubkey);
+              if (name) {
+                fetchedMap[npub] = name;
+                profileCache[ev.pubkey] = { name: data.name, display_name: data.display_name, picture: data.picture };
+              }
+            } catch (e) {}
+          });
+
+          if (isMounted) {
+            setResolvedNames((prev) => ({ ...prev, ...fetchedMap }));
+          }
+        } catch (e) {}
+      }
+    };
+
+    fetchNames();
+    return () => {
+      isMounted = false;
+    };
+  }, [text]);
+
+  // npub部分をパースして綺麗に置換
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  const regex = new RegExp(NPUB_REGEX);
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    const fullMatch = match[0];
+    const npub = match[2];
+    const startIndex = match.index;
+
+    if (startIndex > lastIndex) {
+      parts.push(text.slice(lastIndex, startIndex));
+    }
+
+    const displayName = resolvedNames[npub] || `@${npub.slice(0, 8)}...`;
+    parts.push(
+      <span key={startIndex} className="text-blue-400 font-semibold bg-blue-500/10 px-1 rounded">
+        @{displayName}
+      </span>
+    );
+
+    lastIndex = startIndex + fullMatch.length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return <>{parts.length > 0 ? parts : text}</>;
+}
+
 export function PostCard({ post, mode }: PostCardProps) {
   const [profile, setProfile] = useState<Profile | null>(
     profileCache[post.pubkey] || null
@@ -273,7 +375,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     return null;
   });
 
-  // リレーから取得した中に自分のリアクションが含まれているかどうかのフラグ
   const [hasMyReactionOnRelay, setHasMyReactionOnRelay] = useState(false);
 
   useEffect(() => {
@@ -295,16 +396,8 @@ export function PostCard({ post, mode }: PostCardProps) {
   }, [fetchedReactions, post.id]);
 
   const totalFetchedCount = fetchedReactions.length;
-
-  // ▼ 【修正】リレー側に自分のリアクションがまだ反映されておらず、
-  //     かつローカルストレージ等で自分で押した直後の場合のみ +1 する
   const isLocalStorageActive = !!myReaction && !hasMyReactionOnRelay;
-
-  const finalDisplayCount = isLocalStorageActive 
-    ? totalFetchedCount + 1 
-    : totalFetchedCount;
-
-  // 表示する絵文字の決定
+  const finalDisplayCount = isLocalStorageActive ? totalFetchedCount + 1 : totalFetchedCount;
   const displayEmoji = myReaction ? myReaction : '♡';
 
   useEffect(() => {
@@ -445,7 +538,9 @@ export function PostCard({ post, mode }: PostCardProps) {
 
     return (
       <div>
-        <p className="whitespace-pre-wrap break-words">{textOnly}</p>
+        <p className="whitespace-pre-wrap break-words">
+          <MentionTextRenderer text={textOnly} />
+        </p>
         
         {beacons.map((beacon, i) => (
           <EmbeddedNoteCard key={i} beacon={beacon} />
@@ -518,7 +613,6 @@ export function PostCard({ post, mode }: PostCardProps) {
           {mode === 'PHANTOM' && (
             <div className="flex items-center justify-between mt-3 text-xs opacity-70">
               <div className="flex items-center gap-4 flex-wrap">
-                {/* 返信ボタン */}
                 <button
                   onClick={() => setShowReplyBox(!showReplyBox)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-700 hover:border-slate-500 hover:text-blue-500 transition-colors"
@@ -526,7 +620,6 @@ export function PostCard({ post, mode }: PostCardProps) {
                   <span>💬</span> <span>返信</span>
                 </button>
                 
-                {/* リポストボタン */}
                 <button
                   onClick={() => confirm('この投稿をリポストしますか？') && alert('リポスト機能は調整中です')}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-700 hover:border-slate-500 hover:text-green-500 transition-colors"
@@ -534,7 +627,6 @@ export function PostCard({ post, mode }: PostCardProps) {
                   <span>🔁</span> <span>リポスト</span>
                 </button>
                 
-                {/* リアクションボタン */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleReactionClick}
