@@ -273,12 +273,16 @@ export function PostCard({ post, mode }: PostCardProps) {
     return null;
   });
 
+  // リレーから取得した中に自分のリアクションが含まれているかどうかのフラグ
+  const [hasMyReactionOnRelay, setHasMyReactionOnRelay] = useState(false);
+
   useEffect(() => {
     if (window.nostr && typeof window.nostr.getPublicKey === 'function') {
       window.nostr.getPublicKey().then((pubkey) => {
         if (pubkey) {
           const myExistingReactionEvent = fetchedReactions.find((r) => r.pubkey === pubkey);
           if (myExistingReactionEvent) {
+            setHasMyReactionOnRelay(true);
             const emoji = myExistingReactionEvent.content.trim() === '' ? '♡' : myExistingReactionEvent.content;
             setMyReaction(emoji);
             try {
@@ -291,12 +295,16 @@ export function PostCard({ post, mode }: PostCardProps) {
   }, [fetchedReactions, post.id]);
 
   const totalFetchedCount = fetchedReactions.length;
-  const isLocalStorageActive = !!myReaction;
+
+  // ▼ 【修正】リレー側に自分のリアクションがまだ反映されておらず、
+  //     かつローカルストレージ等で自分で押した直後の場合のみ +1 する
+  const isLocalStorageActive = !!myReaction && !hasMyReactionOnRelay;
 
   const finalDisplayCount = isLocalStorageActive 
-    ? (totalFetchedCount === 0 ? 1 : totalFetchedCount + 1) 
+    ? totalFetchedCount + 1 
     : totalFetchedCount;
 
+  // 表示する絵文字の決定
   const displayEmoji = myReaction ? myReaction : '♡';
 
   useEffect(() => {
