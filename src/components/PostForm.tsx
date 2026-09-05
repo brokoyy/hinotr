@@ -99,30 +99,36 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     };
   }, [isOpen, pubkey]);
 
-  // 入力値変更時の監視（@メンションの検知）
+  // 入力値変更時の監視（超軽量化：通常時は判定を最小限にし、不要なステート更新を避ける）
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
     const cursorPosition = e.target.selectionStart;
     setContent(val);
 
-    const textBeforeCursor = val.slice(0, cursorPosition);
-    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+    // すでにメンション入力中、または入力文字列に '@' が含まれている場合のみチェックを行う
+    if (mentionQuery !== null || val.includes('@')) {
+      const textBeforeCursor = val.slice(0, cursorPosition);
+      const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
-    if (lastAtIndex !== -1) {
-      const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
-      if (/\s/.test(charBeforeAt)) {
-        const query = textBeforeCursor.slice(lastAtIndex + 1);
-        if (!/\s/.test(query)) {
-          setMentionQuery(query);
-          setMentionStartIndex(lastAtIndex);
-          setSelectedIndex(0);
-          return;
+      if (lastAtIndex !== -1) {
+        const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
+        if (/\s/.test(charBeforeAt)) {
+          const query = textBeforeCursor.slice(lastAtIndex + 1);
+          if (!/\s/.test(query)) {
+            setMentionQuery(query);
+            setMentionStartIndex(lastAtIndex);
+            setSelectedIndex(0);
+            return;
+          }
         }
       }
     }
 
-    setMentionQuery(null);
-    setMentionStartIndex(-1);
+    // メンション中でない場合は、すでにnullなら余計なsetStateを呼ばない
+    if (mentionQuery !== null) {
+      setMentionQuery(null);
+      setMentionStartIndex(-1);
+    }
   };
 
   // メンション候補の絞り込み
@@ -207,7 +213,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     try {
       const uploadUrl = 'https://nostr.build/api/v2/nip96/upload';
 
-      // NIP-98 HTTP Auth イベント（Kind 27235）の作成
       const authEventTemplate = {
         kind: 27235,
         created_at: Math.floor(Date.now() / 1000),
@@ -238,9 +243,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
       }
 
       const data = await response.json();
-      console.log('nostr.build response:', data); // デバッグ用
-
-      // nostr.build v2 / NIP-96 のレスポンスからURLを探す多様なパス
       const imageUrl = 
         data.data?.[0]?.url || 
         data.data?.url || 
