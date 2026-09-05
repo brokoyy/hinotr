@@ -127,16 +127,17 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // 3. メインのタイムライン取得処理（関数として切り出して再利用できるようにする）
+  // 3. 共通のターゲットオーサー定義
+  const targetAuthors = follows.length > 0 && pubkey ? follows : (pubkey ? [pubkey] : []);
+
+  // 4. メインのタイムライン取得処理とタブ復帰・ポーリング
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) return;
 
     const fetchPosts = async () => {
-      // キャッシュがある場合は初回フェッチ済みでも、タブ復帰時などに強制再フェッチさせたいのでフラグの強制リセットを考慮
       const now = Math.floor(Date.now() / 1000);
       let filter: any = {};
-      const targetAuthors = follows.length > 0 ? follows : [pubkey];
 
       if (mode === 'PHANTOM') {
         const tenMinutesAgo = now - 600;
@@ -211,21 +212,20 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     fetchPosts();
 
-    // ★ タブがアクティブに戻ってきたときに、スタックを解消して再同期するリスナー
+    // タブがアクティブに戻ってきたときにスタックを解消して再同期するリスナー
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        // フラグをリセットして再フェッチを許可し、固まりを防ぐ
         fetchedModes.current[mode] = false;
         fetchPosts();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 4. PHANTOMモード時のリアルタイムポーリング
+    // PHANTOMモード時のリアルタイムポーリング
     let intervalId: any;
     if (mode === 'PHANTOM') {
       intervalId = setInterval(async () => {
-        if (!isMounted || document.visibilityState !== 'visible') return; // 非表示時はポーリングをスキップして負荷軽減
+        if (!isMounted || document.visibilityState !== 'visible') return;
         try {
           const latestQueryTime = Math.floor(Date.now() / 1000) - 600;
           const newRawPosts = (await pool.querySync(relays, {
@@ -270,7 +270,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (intervalId) clearInterval(intervalId);
     };
-  }, [follows, mode, pubkey, relays, pendingPosts]);
+  }, [follows, mode, pubkey, relays, pendingPosts, targetAuthors]);
 
   const loadNewPosts = () => {
     if (pendingPosts.length === 0) return;
