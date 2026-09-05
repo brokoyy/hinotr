@@ -54,7 +54,8 @@ export default function App() {
     } catch (e) {}
   }, [theme]);
 
-  const { posts, relays, userProfile } = useNostrTimeline(pubkey, mode);
+  // フックから posts に加え、pendingPosts と loadNewPosts を受け取る
+  const { posts, pendingPosts, loadNewPosts, relays, userProfile } = useNostrTimeline(pubkey, mode);
   const { notifications, loading: notificationsLoading } = useNostrNotifications(pubkey);
 
   // 未読判定：最新の通知の created_at が lastReadTime よりも大きければ未読あり
@@ -126,7 +127,12 @@ export default function App() {
           )}
 
           {pubkey && posts.length > 0 && (
-            <Timeline posts={posts} mode={mode} />
+            <Timeline 
+              posts={posts} 
+              pendingPosts={pendingPosts} 
+              onLoadNew={loadNewPosts} 
+              mode={mode} 
+            />
           )}
         </main>
 
