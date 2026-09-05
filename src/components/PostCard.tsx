@@ -277,9 +277,9 @@ export function PostCard({ post, mode }: PostCardProps) {
   const handleReactionClick = async () => {
     if (mode === 'HINOTORI' || !window.nostr || isReacting) return;
 
-    // ▼ ステートセッターのコールバック関数を使い、確実に直前の値から交互に切り替える
+    // ▼ 🎤 と 🎸 をランダムに決定する
+    const nextEmoji = Math.random() < 0.5 ? '🎤' : '🎸';
     const prevReaction = myReaction;
-    const nextEmoji = prevReaction === '🎤' ? '🎸' : '🎤';
 
     setIsReacting(true);
     setMyReaction(nextEmoji);
