@@ -47,7 +47,7 @@ export function ParsedContent({ content, tags = [], className = '' }: ParsedCont
           src={url}
           alt={`:${code}:`}
           title={`:${code}:`}
-          className="inline-block w-5 h-5 align-text-bottom object-contain mx-0.5"
+          className="inline-block w-5 h-5 align-text-bottom object-contain mx-0"
           loading="lazy"
         />
       );
