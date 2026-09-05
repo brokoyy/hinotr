@@ -127,33 +127,34 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // 3. メインのタイムライン取得（モードが切り替わったとき、まだそのモードのデータを取得していなければフェッチする）
+  // 3. メインのタイムライン取得処理（関数として切り出して再利用できるようにする）
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) return;
 
-    const now = Math.floor(Date.now() / 1000);
-    let filter: any = {};
-    const targetAuthors = follows.length > 0 ? follows : [pubkey];
-
-    if (mode === 'PHANTOM') {
-      const tenMinutesAgo = now - 600;
-      filter = { kinds: [1], since: tenMinutesAgo, limit: 100, authors: targetAuthors };
-    } else {
-      const ONE_YEAR = 365 * 24 * 60 * 60;
-      const SIX_HOURS = 6 * 60 * 60;
-      const oneYearAgoNow = now - ONE_YEAR;
-
-      filter = {
-        kinds: [1],
-        since: oneYearAgoNow - SIX_HOURS,
-        until: oneYearAgoNow,
-        limit: 300,
-        authors: targetAuthors,
-      };
-    }
-
     const fetchPosts = async () => {
+      // キャッシュがある場合は初回フェッチ済みでも、タブ復帰時などに強制再フェッチさせたいのでフラグの強制リセットを考慮
+      const now = Math.floor(Date.now() / 1000);
+      let filter: any = {};
+      const targetAuthors = follows.length > 0 ? follows : [pubkey];
+
+      if (mode === 'PHANTOM') {
+        const tenMinutesAgo = now - 600;
+        filter = { kinds: [1], since: tenMinutesAgo, limit: 100, authors: targetAuthors };
+      } else {
+        const ONE_YEAR = 365 * 24 * 60 * 60;
+        const SIX_HOURS = 6 * 60 * 60;
+        const oneYearAgoNow = now - ONE_YEAR;
+
+        filter = {
+          kinds: [1],
+          since: oneYearAgoNow - SIX_HOURS,
+          until: oneYearAgoNow,
+          limit: 300,
+          authors: targetAuthors,
+        };
+      }
+
       if (fetchedModes.current[mode]) return;
 
       setLoading(true);
@@ -210,10 +211,21 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     fetchPosts();
 
+    // ★ タブがアクティブに戻ってきたときに、スタックを解消して再同期するリスナー
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // フラグをリセットして再フェッチを許可し、固まりを防ぐ
+        fetchedModes.current[mode] = false;
+        fetchPosts();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     // 4. PHANTOMモード時のリアルタイムポーリング
+    let intervalId: any;
     if (mode === 'PHANTOM') {
-      const intervalId = setInterval(async () => {
-        if (!isMounted) return;
+      intervalId = setInterval(async () => {
+        if (!isMounted || document.visibilityState !== 'visible') return; // 非表示時はポーリングをスキップして負荷軽減
         try {
           const latestQueryTime = Math.floor(Date.now() / 1000) - 600;
           const newRawPosts = (await pool.querySync(relays, {
@@ -251,12 +263,13 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           console.error('バックグラウンド更新エラー:', err);
         }
       }, 10000);
-
-      return () => {
-        isMounted = false;
-        clearInterval(intervalId);
-      };
     }
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (intervalId) clearInterval(intervalId);
+    };
   }, [follows, mode, pubkey, relays, pendingPosts]);
 
   const loadNewPosts = () => {
@@ -274,6 +287,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     if (mode !== 'PHANTOM') return;
 
     const interval = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
       const now = Math.floor(Date.now() / 1000);
 
       setPhantomPosts((prevPosts) => {
