@@ -153,6 +153,7 @@ export default function App() {
         <PostForm
           isOpen={isPostFormOpen}
           onClose={() => setIsPostFormOpen(false)}
+          pubkey={pubkey} 
         />
 
         <SettingsModal
