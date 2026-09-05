@@ -3,6 +3,7 @@ import { nip19 } from 'nostr-tools';
 import type { AppMode, TimelinePost } from '../types/nostr';
 import { pool, DEFAULT_RELAYS } from '../lib/nostr';
 import type { Event as NostrEvent } from 'nostr-tools';
+import { ParsedContent } from './EmojiParser'; // ← EmojiParserをインポート
 
 interface PostCardProps {
   post: TimelinePost;
@@ -29,7 +30,6 @@ const VIDEO_REGEX = /(https?:\/\/[^\s]+?\.(?:mp4|webm|mov)(?:\?[^\s]*)?)/gi;
 const GENERAL_URL_REGEX = /(https?:\/\/[^\s]+)/gi;
 
 const NOSTR_BEACON_REGEX = /(nostr:)?(nevent1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+|note1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+)/gi;
-// npubを検出する正規表現
 const NPUB_REGEX = /(nostr:)?(npub1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]+)/gi;
 
 const getClientName = (tags: string[][]) => {
@@ -256,8 +256,8 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   );
 }
 
-// ユーザー名解決用の小さなコンポーネント（本文中の npub を `@表示名` に変換する）
-function MentionTextRenderer({ text }: { text: string }) {
+// ユーザー名解決用の小さなコンポーネント（本文中の npub を `@表示名` に変換しつつ、カスタム絵文字もパースする）
+function MentionTextRenderer({ text, tags }: { text: string; tags: string[][] }) {
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -336,12 +336,19 @@ function MentionTextRenderer({ text }: { text: string }) {
     const startIndex = match.index;
 
     if (startIndex > lastIndex) {
-      parts.push(text.slice(lastIndex, startIndex));
+      // npubより手前のテキスト部分はカスタム絵文字（ParsedContent）を通す
+      parts.push(
+        <ParsedContent 
+          key={`text-${lastIndex}`} 
+          content={text.slice(lastIndex, startIndex)} 
+          tags={tags} 
+        />
+      );
     }
 
     const displayName = resolvedNames[npub] || `@${npub.slice(0, 8)}...`;
     parts.push(
-      <span key={startIndex} className="text-blue-400 font-semibold bg-blue-500/10 px-1 rounded">
+      <span key={`npub-${startIndex}`} className="text-blue-400 font-semibold bg-blue-500/10 px-1 rounded inline-block">
         @{displayName}
       </span>
     );
@@ -350,10 +357,16 @@ function MentionTextRenderer({ text }: { text: string }) {
   }
 
   if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+    parts.push(
+      <ParsedContent 
+        key={`text-${lastIndex}`} 
+        content={text.slice(lastIndex)} 
+        tags={tags} 
+      />
+    );
   }
 
-  return <>{parts.length > 0 ? parts : text}</>;
+  return <>{parts.length > 0 ? parts : <ParsedContent content={text} tags={tags} />}</>;
 }
 
 export function PostCard({ post, mode }: PostCardProps) {
@@ -520,7 +533,7 @@ export function PostCard({ post, mode }: PostCardProps) {
     }
   };
 
-  const renderContent = (content: string) => {
+  const renderContent = (content: string, tags: string[][]) => {
     const beacons: string[] = (content.match(NOSTR_BEACON_REGEX) || []) as string[];
     const images: string[] = (content.match(IMAGE_REGEX) || []) as string[];
     const videos: string[] = (content.match(VIDEO_REGEX) || []) as string[];
@@ -539,7 +552,8 @@ export function PostCard({ post, mode }: PostCardProps) {
     return (
       <div>
         <p className="whitespace-pre-wrap break-words">
-          <MentionTextRenderer text={textOnly} />
+          {/* メンション解決とカスタム絵文字パースの両方に対応 */}
+          <MentionTextRenderer text={textOnly} tags={tags} />
         </p>
         
         {beacons.map((beacon, i) => (
@@ -608,7 +622,8 @@ export function PostCard({ post, mode }: PostCardProps) {
             </span>
           </div>
 
-          {renderContent(post.content)}
+          {/* tags を渡してあげる */}
+          {renderContent(post.content, post.tags)}
 
           {mode === 'PHANTOM' && (
             <div className="flex items-center justify-between mt-3 text-xs opacity-70">
