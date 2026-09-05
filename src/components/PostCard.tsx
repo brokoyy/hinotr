@@ -35,12 +35,10 @@ const getClientName = (tags: string[][]) => {
   return clientTag ? clientTag[1] : null;
 };
 
-// YouTubeやXなどのURLを判定してリッチに表示するLinkCard
 function LinkCard({ url }: { url: string }) {
   const [ogp, setOgp] = useState<OgpData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // YouTubeの判定とサムネイル抽出
   const getYouTubeInfo = (targetUrl: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = targetUrl.match(regExp);
@@ -51,7 +49,6 @@ function LinkCard({ url }: { url: string }) {
 
   useEffect(() => {
     let isMounted = true;
-    // YouTubeの場合はAPIを叩かずにサムネイルを自前で出せるのでスキップ可能
     if (youtubeId) {
       setLoading(false);
       return;
@@ -74,7 +71,6 @@ function LinkCard({ url }: { url: string }) {
     };
   }, [url, youtubeId]);
 
-  // YouTubeの場合の専用カード表示
   if (youtubeId) {
     return (
       <a
@@ -269,13 +265,39 @@ export function PostCard({ post, mode }: PostCardProps) {
 
   const fetchedReactions: NostrEvent[] = (post as any).reactions || [];
 
+  // ログイン中の自分のpubkey（window.nostr等から簡易取得できる場合はそれを利用、またはローカルストレージなど）
+  // ここではリレーから取得したリアクションの中に、自分のpubkeyによるものがあるかをチェックします
+  const myPubkey = window.nostr ? '' : ''; // 拡張機能からpubkeyが取れるならここで照合可能
+
+  // リレーから取得したリアクションの中に自分が押したものが含まれているか探す、またはローカルストレージを見る
   const [myReaction, setMyReaction] = useState<string | null>(() => {
     try {
-      return localStorage.getItem(`hinotr_reaction_${post.id}`) || null;
-    } catch {
-      return null;
-    }
+      // まずローカルストレージを確認
+      const localSaved = localStorage.getItem(`hinotr_reaction_${post.id}`);
+      if (localSaved) return localSaved;
+    } catch {}
+    return null;
   });
+
+  // リレーから取得したリアクション（fetchedReactions）を解析して、自分が他のクライアントで押したリアクションがあれば自動反映する
+  useEffect(() => {
+    if (window.nostr && typeof window.nostr.getPublicKey === 'function') {
+      window.nostr.getPublicKey().then((pubkey) => {
+        if (pubkey) {
+          // リレー上のリアクションから自分のpubkeyのものを探す
+          const myExistingReactionEvent = fetchedReactions.find((r) => r.pubkey === pubkey);
+          if (myExistingReactionEvent) {
+            // contentが空（単なる+評価）の場合は♡、絵文字が入っていればその絵文字にする
+            const emoji = myExistingReactionEvent.content.trim() === '' ? '♡' : myExistingReactionEvent.content;
+            setMyReaction(emoji);
+            try {
+              localStorage.setItem(`hinotr_reaction_${post.id}`, emoji);
+            } catch {}
+          }
+        }
+      }).catch(() => {});
+    }
+  }, [fetchedReactions, post.id]);
 
   const totalFetchedCount = fetchedReactions.length;
   const isLocalStorageActive = !!myReaction;
@@ -283,6 +305,9 @@ export function PostCard({ post, mode }: PostCardProps) {
   const finalDisplayCount = isLocalStorageActive 
     ? (totalFetchedCount === 0 ? 1 : totalFetchedCount + 1) 
     : totalFetchedCount;
+
+  // 表示する絵文字の決定（自分が押していればその絵文字、なければデフォルトの♡）
+  const displayEmoji = myReaction ? myReaction : '♡';
 
   useEffect(() => {
     if (profileCache[post.pubkey]) {
@@ -322,6 +347,7 @@ export function PostCard({ post, mode }: PostCardProps) {
   const handleReactionClick = async () => {
     if (mode === 'HINOTORI' || !window.nostr || isReacting) return;
 
+    // ▼ 🎤 と 🎸 をランダムに決定する（これまで通り）
     const nextEmoji = Math.random() < 0.5 ? '🎤' : '🎸';
     const prevReaction = myReaction;
 
@@ -522,7 +548,7 @@ export function PostCard({ post, mode }: PostCardProps) {
                         : 'border-slate-700 hover:border-slate-500 hover:text-red-500'
                     }`}
                   >
-                    <span>{myReaction ? myReaction : '♡'}</span>
+                    <span>{displayEmoji}</span>
                     <span className="text-xs font-bold">{finalDisplayCount}</span>
                   </button>
                 </div>
