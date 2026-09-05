@@ -2,6 +2,7 @@ import React from 'react';
 import type { Theme } from '../types/nostr';
 import type { NotificationItem } from '../hooks/useNostrNotifications';
 import { nip19 } from 'nostr-tools';
+import { ParsedContent } from './EmojiParser'; // ← EmojiParserをインポート
 
 interface NotificationsModalProps {
   isOpen: boolean;
@@ -124,15 +125,18 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                   </div>
                 </div>
 
-                {/* リプライやリアクションの内容表示 */}
+                {/* リプライやリアクションの内容表示（ParsedContentを使用） */}
                 {item.kind === 1 && item.content && (
-                  <p className="text-sm whitespace-pre-wrap break-words opacity-90 font-medium">
-                    {item.content}
-                  </p>
+                  <div className="text-sm whitespace-pre-wrap break-words opacity-90 font-medium">
+                    <ParsedContent content={item.content} tags={item.tags} />
+                  </div>
                 )}
                 {item.kind === 7 && item.content && (
                   <p className="text-xs opacity-80">
-                    リアクション: <span className="font-bold">{item.content}</span>
+                    リアクション:{' '}
+                    <span className="font-bold">
+                      <ParsedContent content={item.content} tags={item.tags} />
+                    </span>
                   </p>
                 )}
 
@@ -149,9 +153,9 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
                       <span>対象の投稿</span>
                       <span>{formatPubkey(item.targetEvent.pubkey)}</span>
                     </div>
-                    <p className="line-clamp-2 opacity-90">
-                      {item.targetEvent.content}
-                    </p>
+                    <div className="line-clamp-2 opacity-90">
+                      <ParsedContent content={item.targetEvent.content} tags={item.targetEvent.tags} />
+                    </div>
                   </div>
                 )}
 
