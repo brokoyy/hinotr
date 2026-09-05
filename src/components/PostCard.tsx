@@ -451,18 +451,20 @@ export function PostCard({ post, mode }: PostCardProps) {
           {mode === 'PHANTOM' && (
             <div className="flex items-center justify-between mt-3 text-xs opacity-70">
               <div className="flex items-center gap-4 flex-wrap">
+                {/* 返信ボタン */}
                 <button
                   onClick={() => setShowReplyBox(!showReplyBox)}
-                  className="hover:text-blue-500 flex items-center gap-1"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-700 hover:border-slate-500 hover:text-blue-500 transition-colors"
                 >
-                  💬 <span>返信</span>
+                  <span>💬</span> <span>返信</span>
                 </button>
                 
+                {/* リポストボタン */}
                 <button
                   onClick={() => confirm('この投稿をリポストしますか？') && alert('リポスト機能は調整中です')}
-                  className="hover:text-green-500 flex items-center gap-1"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-slate-700 hover:border-slate-500 hover:text-green-500 transition-colors"
                 >
-                  🔁 <span>リポスト</span>
+                  <span>🔁</span> <span>リポスト</span>
                 </button>
                 
                 {/* リアクションボタン */}
