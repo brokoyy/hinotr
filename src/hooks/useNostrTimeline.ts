@@ -55,8 +55,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [, setLoading] = useState<boolean>(false);
 
-  // 初回フェッチ済みフラグ（モード切替ごとの無駄な重複フェッチを防ぐ）
-  const fetchedModes = useRef<{ [key in AppMode]?: boolean }>({});
+  // 最後にフェッチした際の targetAuthors を保持（変更時に再フェッチさせるため）
+  const lastFetchedAuthorsRef = useRef<string>('');
 
   // 1. ユーザープロフィールの取得
   useEffect(() => {
@@ -130,10 +130,15 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   // 3. 共通のターゲットオーサー定義
   const targetAuthors = follows.length > 0 && pubkey ? follows : (pubkey ? [pubkey] : []);
 
-  // 4. メインのタイムライン取得処理とタブ復帰・ポーリング
+  // 4. メインのタイムライン取得処理
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) return;
+
+    const authorsKey = targetAuthors.join(',');
+    // モードが変わった、またはフォロワーリストが読み込まれて対象作者が変わった場合は再フェッチを許可
+    const fetchKey = `${mode}_${authorsKey}`;
+    if (lastFetchedAuthorsRef.current === fetchKey) return;
 
     const fetchPosts = async () => {
       const now = Math.floor(Date.now() / 1000);
@@ -155,8 +160,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           authors: targetAuthors,
         };
       }
-
-      if (fetchedModes.current[mode]) return;
 
       setLoading(true);
       try {
@@ -191,16 +194,17 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           });
 
           const sorted = postsWithReactions.sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
-          if (sorted.length > 0) {
-            if (mode === 'PHANTOM') {
-              setPhantomPosts(sorted);
-              localStorage.setItem(STORAGE_KEY_POSTS_PHANTOM, JSON.stringify(sorted));
-            } else {
-              setHinotoriPosts(sorted);
-              localStorage.setItem(STORAGE_KEY_POSTS_HINOTORI, JSON.stringify(sorted));
-            }
+          
+          // 取得できた場合、あるいは初回でデータがない場合もキャッシュ/状態を更新
+          if (mode === 'PHANTOM') {
+            setPhantomPosts(sorted);
+            localStorage.setItem(STORAGE_KEY_POSTS_PHANTOM, JSON.stringify(sorted));
+          } else {
+            setHinotoriPosts(sorted);
+            localStorage.setItem(STORAGE_KEY_POSTS_HINOTORI, JSON.stringify(sorted));
           }
-          fetchedModes.current[mode] = true;
+
+          lastFetchedAuthorsRef.current = fetchKey;
           setPendingPosts([]);
         }
       } catch (e) {
@@ -212,10 +216,10 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     fetchPosts();
 
-    // タブがアクティブに戻ってきたときにスタックを解消して再同期するリスナー
+    // タブがアクティブに戻ってきたときに再同期するリスナー
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        fetchedModes.current[mode] = false;
+        lastFetchedAuthorsRef.current = '';
         fetchPosts();
       }
     };
