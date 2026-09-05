@@ -325,7 +325,7 @@ function MentionTextRenderer({ text }: { text: string }) {
   }, [text]);
 
   // npub部分をパースして綺麗に置換
-  const parts: (string | JSX.Element)[] = [];
+  const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   const regex = new RegExp(NPUB_REGEX);
   let match;
