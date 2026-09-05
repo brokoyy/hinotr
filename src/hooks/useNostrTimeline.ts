@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { NostrEvent, AppMode, TimelinePost } from '../types/nostr';
 import { pool, DEFAULT_RELAYS } from '../lib/nostr';
 
@@ -8,12 +8,14 @@ export interface UserProfile {
 }
 
 const STORAGE_KEY_RELAYS = 'hinotr_relays';
-const STORAGE_KEY_POSTS = 'hinotr_cached_posts';
+const STORAGE_KEY_POSTS_PHANTOM = 'hinotr_cached_posts_phantom';
+const STORAGE_KEY_POSTS_HINOTORI = 'hinotr_cached_posts_hinotori';
 
 export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
-  const [posts, setPosts] = useState<TimelinePost[]>(() => {
+  // モードごとに独立したキャッシュを持つ
+  const [phantomPosts, setPhantomPosts] = useState<TimelinePost[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY_POSTS);
+      const saved = localStorage.getItem(STORAGE_KEY_POSTS_PHANTOM);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -21,6 +23,21 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     } catch (e) {}
     return [];
   });
+
+  const [hinotoriPosts, setHinotoriPosts] = useState<TimelinePost[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_POSTS_HINOTORI);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  // 現在のモードに応じたpostsを返す
+  const posts = mode === 'PHANTOM' ? phantomPosts : hinotoriPosts;
+  const setPosts = mode === 'PHANTOM' ? setPhantomPosts : setHinotoriPosts;
 
   const [pendingPosts, setPendingPosts] = useState<TimelinePost[]>([]);
   const [follows, setFollows] = useState<string[]>([]);
@@ -38,6 +55,9 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [, setLoading] = useState<boolean>(false);
+
+  // 初回フェッチ済みフラグ（モード切替ごとの無駄な重複フェッチを防ぐ）
+  const fetchedModes = useRef<{ [key in AppMode]?: boolean }>({});
 
   // 1. ユーザープロフィールの取得
   useEffect(() => {
@@ -108,7 +128,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // 3. メインのタイムライン取得
+  // 3. メインのタイムライン取得（モードが切り替わったとき、まだそのモードのデータを取得していなければフェッチする）
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) return;
@@ -135,6 +155,9 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
 
     const fetchPosts = async () => {
+      // すでにキャッシュや描画データがあり、このセッションで一度取得していれば再フェッチをスキップしてサクサク動かす
+      if (fetchedModes.current[mode]) return;
+
       setLoading(true);
       try {
         const rawPosts = (await pool.querySync(relays, filter as any)) as NostrEvent[];
@@ -169,9 +192,15 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
           const sorted = postsWithReactions.sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
           if (sorted.length > 0) {
-            setPosts(sorted);
-            localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sorted));
+            if (mode === 'PHANTOM') {
+              setPhantomPosts(sorted);
+              localStorage.setItem(STORAGE_KEY_POSTS_PHANTOM, JSON.stringify(sorted));
+            } else {
+              setHinotoriPosts(sorted);
+              localStorage.setItem(STORAGE_KEY_POSTS_HINOTORI, JSON.stringify(sorted));
+            }
           }
+          fetchedModes.current[mode] = true;
           setPendingPosts([]);
         }
       } catch (e) {
@@ -183,12 +212,12 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     fetchPosts();
 
-    // ★ 4. リアルタイム更新（WebSocket購読の代わりに、10秒おきに最新の投稿をポーリングしてバッジに溜める方式）
+    // 4. PHANTOMモード時のリアルタイムポーリング
     if (mode === 'PHANTOM') {
       const intervalId = setInterval(async () => {
         if (!isMounted) return;
         try {
-          const latestQueryTime = Math.floor(Date.now() / 1000) - 600; // 直近10分
+          const latestQueryTime = Math.floor(Date.now() / 1000) - 600;
           const newRawPosts = (await pool.querySync(relays, {
             kinds: [1],
             since: latestQueryTime,
@@ -198,7 +227,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
           if (!isMounted || newRawPosts.length === 0) return;
 
-          setPosts((currentPosts) => {
+          setPhantomPosts((currentPosts) => {
             const existingIds = new Set([...currentPosts.map((p) => p.id), ...pendingPosts.map((p) => p.id)]);
             
             const brandNew = newRawPosts.filter((p) => !existingIds.has(p.id));
@@ -223,20 +252,20 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         } catch (err) {
           console.error('バックグラウンド更新エラー:', err);
         }
-      }, 10000); // 10秒ごとに自動チェック
+      }, 10000);
 
       return () => {
         isMounted = false;
         clearInterval(intervalId);
       };
     }
-  }, [follows, mode, pubkey, relays]);
+  }, [follows, mode, pubkey, relays, pendingPosts]);
 
   const loadNewPosts = () => {
     if (pendingPosts.length === 0) return;
-    setPosts((prev) => {
+    setPhantomPosts((prev) => {
       const updated = [...pendingPosts, ...prev].sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
-      localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEY_POSTS_PHANTOM, JSON.stringify(updated));
       return updated;
     });
     setPendingPosts([]);
@@ -249,7 +278,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const interval = setInterval(() => {
       const now = Math.floor(Date.now() / 1000);
 
-      setPosts((prevPosts) => {
+      setPhantomPosts((prevPosts) => {
         const filtered = prevPosts
           .filter((post) => now - post.created_at < 600)
           .map((post) => ({
