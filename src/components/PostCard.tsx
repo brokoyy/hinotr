@@ -35,12 +35,28 @@ const getClientName = (tags: string[][]) => {
   return clientTag ? clientTag[1] : null;
 };
 
+// YouTubeやXなどのURLを判定してリッチに表示するLinkCard
 function LinkCard({ url }: { url: string }) {
   const [ogp, setOgp] = useState<OgpData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // YouTubeの判定とサムネイル抽出
+  const getYouTubeInfo = (targetUrl: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = targetUrl.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  const youtubeId = getYouTubeInfo(url);
+
   useEffect(() => {
     let isMounted = true;
+    // YouTubeの場合はAPIを叩かずにサムネイルを自前で出せるのでスキップ可能
+    if (youtubeId) {
+      setLoading(false);
+      return;
+    }
+
     fetch(`https://api.microlink.io?url=${encodeURIComponent(url)}`)
       .then((res) => res.json())
       .then((data) => {
@@ -56,7 +72,36 @@ function LinkCard({ url }: { url: string }) {
     return () => {
       isMounted = false;
     };
-  }, [url]);
+  }, [url, youtubeId]);
+
+  // YouTubeの場合の専用カード表示
+  if (youtubeId) {
+    return (
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl overflow-hidden transition-all duration-200 group my-2 text-slate-900 dark:text-slate-100"
+      >
+        <div className="flex flex-col sm:flex-row">
+          <img
+            src={`https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`}
+            alt="YouTube thumbnail"
+            className="w-full sm:w-48 h-32 object-cover flex-shrink-0"
+          />
+          <div className="p-3 flex flex-col justify-center min-w-0 flex-1">
+            <span className="inline-block px-1.5 py-0.5 bg-red-500/10 text-red-500 text-[10px] font-bold rounded w-max mb-1">
+              YouTube
+            </span>
+            <h4 className="font-bold text-xs truncate group-hover:text-blue-500 dark:group-hover:text-blue-400">
+              YouTube Video
+            </h4>
+            <span className="text-[10px] opacity-40 truncate mt-1">{url}</span>
+          </div>
+        </div>
+      </a>
+    );
+  }
 
   return (
     <a
@@ -66,7 +111,7 @@ function LinkCard({ url }: { url: string }) {
       className="block border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900 rounded-xl overflow-hidden transition-all duration-200 group my-2 text-slate-900 dark:text-slate-100"
     >
       {loading ? (
-        <div className="p-3 text-xs opacity-50 truncate">{url}</div>
+        <div className="p-3 text-xs opacity-50 truncate">プレビューを読み込み中... ({url})</div>
       ) : ogp && (ogp.title || ogp.image) ? (
         <div className="flex flex-col sm:flex-row">
           {ogp.image?.url && (
@@ -277,7 +322,6 @@ export function PostCard({ post, mode }: PostCardProps) {
   const handleReactionClick = async () => {
     if (mode === 'HINOTORI' || !window.nostr || isReacting) return;
 
-    // ▼ 🎤 と 🎸 をランダムに決定する
     const nextEmoji = Math.random() < 0.5 ? '🎤' : '🎸';
     const prevReaction = myReaction;
 
