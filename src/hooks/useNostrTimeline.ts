@@ -182,7 +182,14 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     fetchPosts();
 
     if (mode === 'PHANTOM') {
-      const sub = pool.subscribeMany(relays, [filter] as any, {
+      // ライブ購読用のフィルター（現在時刻をベースにリアルタイムのイベントを受信）
+      const liveFilter = {
+        kinds: [1],
+        since: Math.floor(Date.now() / 1000),
+        authors: follows,
+      };
+
+      const sub = pool.subscribeMany(relays, [liveFilter] as any, {
         onevent(event: NostrEvent) {
           if (!isMounted) return;
 
@@ -190,9 +197,15 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
             const currentTime = Math.floor(Date.now() / 1000);
             if (currentTime - event.created_at >= 600) return;
 
-            setPendingPosts((prev) => {
-              if (prev.some((p) => p.id === event.id)) return prev;
-              return [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
+            setPosts((currentPosts) => {
+              if (currentPosts.some((p) => p.id === event.id)) return currentPosts;
+
+              setPendingPosts((prev) => {
+                if (prev.some((p) => p.id === event.id) || currentPosts.some((p) => p.id === event.id)) return prev;
+                return [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
+              });
+
+              return currentPosts;
             });
           }
         },
