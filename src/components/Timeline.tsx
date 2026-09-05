@@ -1,56 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import { PostCard } from './PostCard';
-import type { AppMode } from '../types/nostr';
+import type { AppMode, TimelinePost } from '../types/nostr';
 
 interface TimelineProps {
-  posts: any[];
+  posts: TimelinePost[];
+  pendingPosts: TimelinePost[];
+  onLoadNew: () => void;
   mode: AppMode;
 }
 
-export function Timeline({ posts: initialPosts, mode }: TimelineProps) {
-  const [displayedPosts, setDisplayedPosts] = useState<any[]>([]);
-  const [pendingPosts, setPendingPosts] = useState<any[]>([]);
-  
+export function Timeline({ posts, pendingPosts, onLoadNew, mode }: TimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const prevInitialPostsRef = useRef(initialPosts);
-  useEffect(() => {
-    if (initialPosts !== prevInitialPostsRef.current) {
-      prevInitialPostsRef.current = initialPosts;
-      if (displayedPosts.length === 0) {
-        setDisplayedPosts(initialPosts);
-      } else {
-        const existingIds = new Set(displayedPosts.map((p) => p.id));
-        const newItems = initialPosts.filter((p) => !existingIds.has(p.id));
-        if (newItems.length > 0) {
-          setPendingPosts((prev) => {
-            const currentIds = new Set(prev.map((p) => p.id));
-            const trulyNew = newItems.filter((p) => !currentIds.has(p.id));
-            return [...trulyNew, ...prev];
-          });
-        }
-      }
-    }
-  }, [initialPosts, displayedPosts]);
-
-  useEffect(() => {
-    setDisplayedPosts(initialPosts);
-  }, [initialPosts]);
-
+  // スクロール位置が一番上のときに自動で新着を取り込む場合などの処理
   const handleScroll = () => {
     if (!containerRef.current) return;
     const { scrollTop } = containerRef.current;
     if (scrollTop <= 10 && pendingPosts.length > 0) {
-      setDisplayedPosts((prev) => [...pendingPosts, ...prev]);
-      setPendingPosts([]);
-    }
-  };
-
-  const handleLoadNew = () => {
-    setDisplayedPosts((prev) => [...pendingPosts, ...prev]);
-    setPendingPosts([]);
-    if (containerRef.current) {
-      containerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      onLoadNew();
     }
   };
 
@@ -60,10 +27,11 @@ export function Timeline({ posts: initialPosts, mode }: TimelineProps) {
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto relative"
     >
+      {/* 新着通知バッジ */}
       {pendingPosts.length > 0 && (
         <div className="sticky top-3 z-30 flex justify-center pointer-events-none px-4">
           <button
-            onClick={handleLoadNew}
+            onClick={onLoadNew}
             className="pointer-events-auto bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg transition-all transform hover:scale-105 active:scale-95 flex items-center gap-1.5"
           >
             <span>新着投稿が {pendingPosts.length} 件あります</span>
@@ -74,8 +42,9 @@ export function Timeline({ posts: initialPosts, mode }: TimelineProps) {
         </div>
       )}
 
+      {/* 投稿一覧 */}
       <div>
-        {displayedPosts.map((post) => (
+        {posts.map((post) => (
           <PostCard key={post.id} post={post} mode={mode} />
         ))}
       </div>
