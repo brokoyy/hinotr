@@ -19,8 +19,10 @@ interface MentionUser {
 export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // メンション補完用の一覧・状態
   const [follows, setFollows] = useState<MentionUser[]>([]);
@@ -197,6 +199,51 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     }, 0);
   };
 
+  // nostr.build への画像アップロード処理
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('https://nostr.build/api/v2/upload/files', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('アップロードに失敗しました');
+      }
+
+      const data = await response.json();
+      // nostr.build v2 API のレスポンス構造から画像URLを取得
+      const imageUrl = data.data?.[0]?.url || data.url;
+
+      if (imageUrl) {
+        setContent((prev) => {
+          const trimmed = prev.trim();
+          return trimmed ? `${trimmed}\n${imageUrl}` : imageUrl;
+        });
+      } else {
+        throw new Error('画像URLを取得できませんでした');
+      }
+    } catch (error) {
+      console.error('画像アップロードエラー:', error);
+      alert('画像のアップロードに失敗しました。');
+    } finally {
+      setIsUploading(false);
+      // ファイル選択をリセット（同じファイルを連続で選択できるようにする）
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   // 投稿送信処理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -234,7 +281,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     }
   };
 
-  // ★ isOpen が false のときは何も描画しない（これで常に前面に出る不具合が直ります）
   if (!isOpen) return null;
 
   return (
@@ -249,8 +295,9 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
               value={content}
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}
-              placeholder="今なにしてる？ (@でメンション)"
-              className="w-full h-32 bg-slate-800 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-blue-500 resize-none"
+              placeholder={isUploading ? '画像をアップロード中...' : '今なにしてる？ (@でメンション)'}
+              disabled={isUploading}
+              className="w-full h-32 bg-slate-800 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-blue-500 resize-none disabled:opacity-50"
             />
 
             {/* メンション候補のオートコンプリートポップアップ */}
@@ -283,8 +330,8 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
           </div>
 
           <div className="flex items-center justify-between mt-3">
-            {/* 左下：絵文字ボタン ＆ ピッカーポップアップ */}
-            <div className="relative">
+            {/* 左下：絵文字ボタン ＆ 画像アップロードボタン */}
+            <div className="flex items-center gap-1 relative">
               <button
                 type="button"
                 onClick={() => setShowEmojiPicker((prev) => !prev)}
@@ -293,6 +340,25 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
               >
                 ☺
               </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="p-2 rounded-xl text-lg hover:bg-slate-800 text-gray-300 transition disabled:opacity-50"
+                title="画像を添付"
+              >
+                {isUploading ? '⏳' : '🖼️'}
+              </button>
+
+              {/* 非同期ファイル選択input */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                accept="image/*"
+                className="hidden"
+              />
 
               {showEmojiPicker && (
                 <EmojiPicker
@@ -315,10 +381,10 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !content.trim()}
+                disabled={isSubmitting || isUploading || !content.trim()}
                 className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition"
               >
-                {isSubmitting ? '送信中...' : '投稿する'}
+                {isSubmitting ? '送信中...' : isUploading ? 'アップロード中...' : '投稿する'}
               </button>
             </div>
           </div>
