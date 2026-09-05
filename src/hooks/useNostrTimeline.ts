@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { NostrEvent, AppMode, TimelinePost } from '../types/nostr';
-import { pool, DEFAULT_RELAYS, parseNip65Relays } from '../lib/nostr';
+import { pool, DEFAULT_RELAYS } from '../lib/nostr';
 
 export interface UserProfile {
   picture?: string;
@@ -22,12 +22,10 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return [];
   });
 
-  // ★ リアルタイムで届いた新着投稿をストックするステート
   const [pendingPosts, setPendingPosts] = useState<TimelinePost[]>([]);
-
   const [follows, setFollows] = useState<string[]>([]);
   
-  const [relays, setRelays] = useState<string[]>(() => {
+  const [relays] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_RELAYS);
       if (saved) {
@@ -39,10 +37,78 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   });
 
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+  const [, setLoading] = useState<boolean>(false);
 
-  // （中略：NIP-65 リレーリスト、プロフィール、フォローリストの取得部分はそのまま）
-  // ※長くなるため省略しますが、上記の取得ロジックは一切変更不要です
+  // ユーザープロフィールの取得
+  useEffect(() => {
+    let isMounted = true;
+    if (!pubkey) {
+      setUserProfile(null);
+      return;
+    }
+
+    const fetchUserData = async () => {
+      try {
+        const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://relay-jp.nostr.wirednet.jp']));
+        
+        const profileEvents = await pool.querySync(searchTarget, {
+          kinds: [0],
+          authors: [pubkey],
+          limit: 1,
+        } as any);
+
+        if (isMounted && profileEvents.length > 0) {
+          const metadata = JSON.parse(profileEvents[0].content);
+          setUserProfile({
+            picture: metadata.picture,
+            name: metadata.display_name || metadata.name,
+          });
+        }
+      } catch (e) {
+        console.error('ユーザーデータの取得失敗:', e);
+      }
+    };
+
+    fetchUserData();
+    return () => { isMounted = false; };
+  }, [pubkey]);
+
+  // フォローリスト取得 (Kind 3)
+  useEffect(() => {
+    let isMounted = true;
+    if (!pubkey) {
+      setFollows([]);
+      return;
+    }
+
+    const fetchFollows = async () => {
+      try {
+        const targetRelays = Array.from(new Set([...relays, 'wss://purplepag.es']));
+        const events = await pool.querySync(targetRelays, {
+          kinds: [3],
+          authors: [pubkey],
+          limit: 1,
+        } as any);
+
+        if (isMounted) {
+          if (events.length > 0) {
+            const followPubkeys = events[0].tags
+              .filter((tag) => tag[0] === 'p')
+              .map((tag) => tag[1]);
+            setFollows([...followPubkeys, pubkey]);
+          } else {
+            setFollows([pubkey]);
+          }
+        }
+      } catch (error) {
+        console.error('フォローリストの取得に失敗:', error);
+        if (isMounted) setFollows([pubkey]);
+      }
+    };
+
+    fetchFollows();
+    return () => { isMounted = false; };
+  }, [pubkey, relays]);
 
   // タイムラインの取得
   useEffect(() => {
@@ -103,7 +169,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
           const sorted = postsWithReactions.sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
           setPosts(sorted);
-          setPendingPosts([]); // 初回ロード時は新着ストックをクリア
+          setPendingPosts([]);
           localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sorted));
         }
       } catch (e) {
@@ -124,11 +190,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
             const currentTime = Math.floor(Date.now() / 1000);
             if (currentTime - event.created_at >= 600) return;
 
-            // ★ リアルタイムで流れてきたものは、mainのpostsではなく pendingPosts に溜める
             setPendingPosts((prev) => {
               if (prev.some((p) => p.id === event.id)) return prev;
-              // すでに表示中のpostsにも含まれていればスルー
-              // (ここでは簡易的に新着ストックに追加)
               return [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
             });
           }
@@ -142,7 +205,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
   }, [follows, mode, pubkey, relays]);
 
-  // ★ バッジが押されたときに新着をメインのタイムラインに結合する関数
   const loadNewPosts = () => {
     if (pendingPosts.length === 0) return;
     setPosts((prev) => {
@@ -153,7 +215,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     setPendingPosts([]);
   };
 
-  // PHANTOMのタイマー（メインのpostsから古いものを消す処理）
+  // PHANTOMのタイマー
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 
@@ -174,5 +236,5 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => clearInterval(interval);
   }, [mode]);
 
-  return { posts, pendingPosts, loadNewPosts, loading, relays, userProfile };
+  return { posts, pendingPosts, loadNewPosts, relays, userProfile };
 }
