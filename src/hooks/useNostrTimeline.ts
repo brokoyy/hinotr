@@ -29,7 +29,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_RELAYS);
       if (saved) {
-        const parsed = JSON.parse(saved);
+        const parsed = JSON.parse(parsed);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch (e) {}
@@ -50,7 +50,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     const fetchUserData = async () => {
       try {
         const searchTarget = Array.from(new Set([...DEFAULT_RELAYS, 'wss://relay-jp.nostr.wirednet.jp']));
-        
         const profileEvents = await pool.querySync(searchTarget, {
           kinds: [0],
           authors: [pubkey],
@@ -73,13 +72,16 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey]);
 
-  // フォローリスト取得 (Kind 3)
+  // フォローリスト取得 (Kind 3) - pubkeyが変わったら必ず実行（最低限自分自身をフォロワーに入れて即座に走らせる）
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) {
       setFollows([]);
       return;
     }
+
+    // まず自分自身だけでも即座にセットしてタイムラインのブロックを解除する
+    setFollows([pubkey]);
 
     const fetchFollows = async () => {
       try {
@@ -90,19 +92,16 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           limit: 1,
         } as any);
 
-        if (isMounted) {
-          if (events.length > 0) {
-            const followPubkeys = events[0].tags
-              .filter((tag) => tag[0] === 'p')
-              .map((tag) => tag[1]);
+        if (isMounted && events.length > 0) {
+          const followPubkeys = events[0].tags
+            .filter((tag) => tag[0] === 'p')
+            .map((tag) => tag[1]);
+          if (followPubkeys.length > 0) {
             setFollows([...followPubkeys, pubkey]);
-          } else {
-            setFollows([pubkey]);
           }
         }
       } catch (error) {
         console.error('フォローリストの取得に失敗:', error);
-        if (isMounted) setFollows([pubkey]);
       }
     };
 
@@ -110,17 +109,20 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // タイムラインの取得
+  // タイムラインの取得（follows が空でなくなったら、あるいは pubkey があれば即座に実行）
   useEffect(() => {
     let isMounted = true;
-    if (!pubkey || follows.length === 0) return;
+    if (!pubkey) return;
 
     const now = Math.floor(Date.now() / 1000);
     let filter: any = {};
 
+    // follows がまだ取れていない場合はいったん自分自身を対象にする
+    const targetAuthors = follows.length > 0 ? follows : [pubkey];
+
     if (mode === 'PHANTOM') {
       const tenMinutesAgo = now - 600;
-      filter = { kinds: [1], since: tenMinutesAgo, limit: 100, authors: follows };
+      filter = { kinds: [1], since: tenMinutesAgo, limit: 100, authors: targetAuthors };
     } else {
       const ONE_YEAR = 365 * 24 * 60 * 60;
       const SIX_HOURS = 6 * 60 * 60;
@@ -131,11 +133,12 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
         since: oneYearAgoNow - SIX_HOURS,
         until: oneYearAgoNow,
         limit: 300,
-        authors: follows,
+        authors: targetAuthors,
       };
     }
 
     const fetchPosts = async () => {
+      setLoading(true);
       try {
         const rawPosts = (await pool.querySync(relays, filter as any)) as NostrEvent[];
         if (isMounted) {
@@ -182,11 +185,10 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     fetchPosts();
 
     if (mode === 'PHANTOM') {
-      // ライブ購読用のフィルター（現在時刻をベースにリアルタイムのイベントを受信）
       const liveFilter = {
         kinds: [1],
         since: Math.floor(Date.now() / 1000),
-        authors: follows,
+        authors: targetAuthors,
       };
 
       const sub = pool.subscribeMany(relays, [liveFilter] as any, {
