@@ -58,6 +58,12 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   // 最後にフェッチした際の targetAuthors を保持（変更時に再フェッチさせるため）
   const lastFetchedAuthorsRef = useRef<string>('');
 
+  // ポーリングや非同期処理で最新の状態を参照するためのRef
+  const phantomPostsRef = useRef(phantomPosts);
+  phantomPostsRef.current = phantomPosts;
+  const pendingPostsRef = useRef(pendingPosts);
+  pendingPostsRef.current = pendingPosts;
+
   // 1. ユーザープロフィールの取得
   useEffect(() => {
     let isMounted = true;
@@ -136,7 +142,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     if (!pubkey) return;
 
     const authorsKey = targetAuthors.join(',');
-    // モードが変わった、またはフォロワーリストが読み込まれて対象作者が変わった場合は再フェッチを許可
     const fetchKey = `${mode}_${authorsKey}`;
     if (lastFetchedAuthorsRef.current === fetchKey) return;
 
@@ -195,7 +200,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
           const sorted = postsWithReactions.sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
           
-          // 取得できた場合、あるいは初回でデータがない場合もキャッシュ/状態を更新
           if (mode === 'PHANTOM') {
             setPhantomPosts(sorted);
             localStorage.setItem(STORAGE_KEY_POSTS_PHANTOM, JSON.stringify(sorted));
@@ -241,28 +245,27 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
           if (!isMounted || newRawPosts.length === 0) return;
 
-          setPhantomPosts((currentPosts) => {
-            const existingIds = new Set([...currentPosts.map((p) => p.id), ...pendingPosts.map((p) => p.id)]);
-            
-            const brandNew = newRawPosts.filter((p) => !existingIds.has(p.id));
-            if (brandNew.length === 0) return currentPosts;
+          const existingIds = new Set([
+            ...phantomPostsRef.current.map((p) => p.id),
+            ...pendingPostsRef.current.map((p) => p.id),
+          ]);
+          
+          const brandNew = newRawPosts.filter((p) => !existingIds.has(p.id));
+          if (brandNew.length === 0) return;
 
-            const currentTime = Math.floor(Date.now() / 1000);
-            const validNew = brandNew.filter((p) => currentTime - p.created_at < 600);
+          const currentTime = Math.floor(Date.now() / 1000);
+          const validNew = brandNew.filter((p) => currentTime - p.created_at < 600);
 
-            if (validNew.length > 0) {
-              setPendingPosts((prev) => {
-                const prevIds = new Set(prev.map((p) => p.id));
-                const uniqueNew = validNew.filter((p) => !prevIds.has(p.id));
-                if (uniqueNew.length === 0) return prev;
-                
-                const formatted = uniqueNew.map((p) => ({ ...p, reactions: [] })) as TimelinePost[];
-                return [...formatted, ...prev].sort((a, b) => b.created_at - a.created_at);
-              });
-            }
-
-            return currentPosts;
-          });
+          if (validNew.length > 0) {
+            setPendingPosts((prev) => {
+              const prevIds = new Set(prev.map((p) => p.id));
+              const uniqueNew = validNew.filter((p) => !prevIds.has(p.id));
+              if (uniqueNew.length === 0) return prev;
+              
+              const formatted = uniqueNew.map((p) => ({ ...p, reactions: [] })) as TimelinePost[];
+              return [...formatted, ...prev].sort((a, b) => b.created_at - a.created_at);
+            });
+          }
         } catch (err) {
           console.error('バックグラウンド更新エラー:', err);
         }
@@ -274,7 +277,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (intervalId) clearInterval(intervalId);
     };
-  }, [follows, mode, pubkey, relays, pendingPosts, targetAuthors]);
+  }, [follows, mode, pubkey, relays, targetAuthors]); // pendingPosts を依存配列から除外
 
   const loadNewPosts = () => {
     if (pendingPosts.length === 0) return;
