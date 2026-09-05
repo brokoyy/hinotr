@@ -233,14 +233,20 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
       });
 
       if (!response.ok) {
-        throw new Error(`アップロードに失敗しました: ${response.statusText}`);
+        const errText = await response.text();
+        throw new Error(`アップロード失敗 (${response.status}): ${errText}`);
       }
 
       const data = await response.json();
-      
-      // NIP-96 / nostr.build のレスポンスから画像URLを取得
-      // (data.data.url または data.nip94_event などの構造に対応)
-      const imageUrl = data.data?.[0]?.url || data.data?.url || data.url;
+      console.log('nostr.build response:', data); // デバッグ用
+
+      // nostr.build v2 / NIP-96 のレスポンスからURLを探す多様なパス
+      const imageUrl = 
+        data.data?.[0]?.url || 
+        data.data?.url || 
+        data.url || 
+        data.file?.url ||
+        data.nip94_event?.tags?.find((t: string[]) => t[0] === 'url')?.[1];
 
       if (imageUrl) {
         setContent((prev) => {
@@ -248,7 +254,7 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
           return trimmed ? `${trimmed}\n${imageUrl}` : imageUrl;
         });
       } else {
-        throw new Error('レスポンスから画像URLを取得できませんでした');
+        throw new Error('レスポンス内に画像URLが見つかりませんでした: ' + JSON.stringify(data));
       }
     } catch (error) {
       console.error('画像アップロードエラー:', error);
