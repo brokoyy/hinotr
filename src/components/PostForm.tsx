@@ -41,7 +41,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     let isMounted = true;
     if (!pubkey) return;
 
-    // フォローリスト（Kind 3）を取得し、それぞれのプロフィール（Kind 0）を軽く引く
     const fetchFollowsAndProfiles = async () => {
       try {
         const targetRelays = Array.from(new Set([...DEFAULT_RELAYS, 'wss://purplepag.es']));
@@ -59,7 +58,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
 
         if (followPubkeys.length === 0) return;
 
-        // プロフィール（Kind 0）を一括取得（最大50件程度に絞る）
         const profileEvents = await pool.querySync(DEFAULT_RELAYS, {
           kinds: [0],
           authors: followPubkeys.slice(0, 50),
@@ -67,7 +65,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
 
         const userMap = new Map<string, MentionUser>();
         
-        // まずnpubベースで初期データを入れておく
         followPubkeys.forEach((pk) => {
           try {
             const np = nip19.npubEncode(pk);
@@ -75,7 +72,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
           } catch (e) {}
         });
 
-        // Kind 0のメタデータで上書き
         profileEvents.forEach((ev) => {
           try {
             const meta = JSON.parse(ev.content);
@@ -137,7 +133,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
       ).slice(0, 5)
     : [];
 
-  // メンション候補の選択確定
   const selectMention = (user: MentionUser) => {
     if (mentionStartIndex === -1) return;
 
@@ -162,7 +157,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     }, 0);
   };
 
-  // キーボード操作
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mentionQuery !== null && filteredFollows.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -180,7 +174,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     }
   };
 
-  // 絵文字選択時の処理
   const handleSelectEmoji = (emoji: string) => {
     const textarea = textareaRef.current;
     if (!textarea) {
@@ -199,30 +192,55 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     }, 0);
   };
 
-  // nostr.build への画像アップロード処理
+  // nostr.build への画像アップロード処理（NIP-98認証対応）
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
+    if (!window.nostr) {
+      alert('Nostr拡張機能（NIP-07）が見つかりません');
+      return;
+    }
 
     const file = files[0];
     setIsUploading(true);
 
     try {
+      const uploadUrl = 'https://nostr.build/api/v2/nip96/upload';
+
+      // NIP-98 HTTP Auth イベント（Kind 27235）の作成
+      const authEventTemplate = {
+        kind: 27235,
+        created_at: Math.floor(Date.now() / 1000),
+        tags: [
+          ['u', uploadUrl],
+          ['method', 'POST'],
+        ],
+        content: '',
+      };
+
+      const signedAuthEvent = await window.nostr.signEvent(authEventTemplate);
+      const authHeader = `Nostr ${btoa(JSON.stringify(signedAuthEvent))}`;
+
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('https://nostr.build/api/v2/upload/files', {
+      const response = await fetch(uploadUrl, {
         method: 'POST',
+        headers: {
+          'Authorization': authHeader,
+        },
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('アップロードに失敗しました');
+        throw new Error(`アップロードに失敗しました: ${response.statusText}`);
       }
 
       const data = await response.json();
-      // nostr.build v2 API のレスポンス構造から画像URLを取得
-      const imageUrl = data.data?.[0]?.url || data.url;
+      
+      // NIP-96 / nostr.build のレスポンスから画像URLを取得
+      // (data.data.url または data.nip94_event などの構造に対応)
+      const imageUrl = data.data?.[0]?.url || data.data?.url || data.url;
 
       if (imageUrl) {
         setContent((prev) => {
@@ -230,21 +248,19 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
           return trimmed ? `${trimmed}\n${imageUrl}` : imageUrl;
         });
       } else {
-        throw new Error('画像URLを取得できませんでした');
+        throw new Error('レスポンスから画像URLを取得できませんでした');
       }
     } catch (error) {
       console.error('画像アップロードエラー:', error);
       alert('画像のアップロードに失敗しました。');
     } finally {
       setIsUploading(false);
-      // ファイル選択をリセット（同じファイルを連続で選択できるようにする）
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
 
-  // 投稿送信処理
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!content.trim() || !window.nostr) return;
@@ -300,7 +316,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
               className="w-full h-32 bg-slate-800 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-blue-500 resize-none disabled:opacity-50"
             />
 
-            {/* メンション候補のオートコンプリートポップアップ */}
             {mentionQuery !== null && filteredFollows.length > 0 && (
               <div className="absolute left-0 bottom-full mb-2 w-full bg-slate-800 border border-white/15 rounded-xl shadow-xl overflow-hidden z-20">
                 <div className="p-1 text-xs text-gray-400 border-b border-white/10 px-3">
@@ -330,7 +345,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
           </div>
 
           <div className="flex items-center justify-between mt-3">
-            {/* 左下：絵文字ボタン ＆ 画像アップロードボタン */}
             <div className="flex items-center gap-1 relative">
               <button
                 type="button"
@@ -351,7 +365,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
                 {isUploading ? '⏳' : '🖼️'}
               </button>
 
-              {/* 非同期ファイル選択input */}
               <input
                 type="file"
                 ref={fileInputRef}
@@ -370,7 +383,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
               )}
             </div>
 
-            {/* 右側：キャンセル・投稿ボタン */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
