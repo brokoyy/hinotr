@@ -29,8 +29,8 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_RELAYS);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        const parsedRelays = JSON.parse(saved);
+        if (Array.isArray(parsedRelays) && parsedRelays.length > 0) return parsedRelays;
       }
     } catch (e) {}
     return DEFAULT_RELAYS;
@@ -39,7 +39,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [, setLoading] = useState<boolean>(false);
 
-  // ユーザープロフィールの取得
+  // 1. ユーザープロフィールの取得
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) {
@@ -72,7 +72,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey]);
 
-  // フォローリスト取得 (Kind 3)
+  // 2. フォローリスト取得 (Kind 3)
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) {
@@ -80,7 +80,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
       return;
     }
 
-    // まず自分自身だけでも即座にセットしてタイムラインのブロックを解除する
     setFollows([pubkey]);
 
     const fetchFollows = async () => {
@@ -109,14 +108,13 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     return () => { isMounted = false; };
   }, [pubkey, relays]);
 
-  // タイムラインの取得
+  // 3. メインのタイムライン取得
   useEffect(() => {
     let isMounted = true;
     if (!pubkey) return;
 
     const now = Math.floor(Date.now() / 1000);
     let filter: any = {};
-
     const targetAuthors = follows.length > 0 ? follows : [pubkey];
 
     if (mode === 'PHANTOM') {
@@ -170,9 +168,11 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
           });
 
           const sorted = postsWithReactions.sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
-          setPosts(sorted);
+          if (sorted.length > 0) {
+            setPosts(sorted);
+            localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sorted));
+          }
           setPendingPosts([]);
-          localStorage.setItem(STORAGE_KEY_POSTS, JSON.stringify(sorted));
         }
       } catch (e) {
         console.error('投稿の取得失敗:', e);
@@ -183,38 +183,51 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
     fetchPosts();
 
+    // ★ 4. リアルタイム更新（WebSocket購読の代わりに、10秒おきに最新の投稿をポーリングしてバッジに溜める方式）
     if (mode === 'PHANTOM') {
-      const liveFilter = {
-        kinds: [1],
-        since: Math.floor(Date.now() / 1000),
-        authors: targetAuthors,
-      };
+      const intervalId = setInterval(async () => {
+        if (!isMounted) return;
+        try {
+          const latestQueryTime = Math.floor(Date.now() / 1000) - 600; // 直近10分
+          const newRawPosts = (await pool.querySync(relays, {
+            kinds: [1],
+            since: latestQueryTime,
+            limit: 30,
+            authors: targetAuthors,
+          } as any)) as NostrEvent[];
 
-      const sub = pool.subscribeMany(relays, [liveFilter] as any, {
-        onevent(event: NostrEvent) {
-          if (!isMounted) return;
+          if (!isMounted || newRawPosts.length === 0) return;
 
-          if (event.kind === 1) {
+          setPosts((currentPosts) => {
+            const existingIds = new Set([...currentPosts.map((p) => p.id), ...pendingPosts.map((p) => p.id)]);
+            
+            const brandNew = newRawPosts.filter((p) => !existingIds.has(p.id));
+            if (brandNew.length === 0) return currentPosts;
+
             const currentTime = Math.floor(Date.now() / 1000);
-            if (currentTime - event.created_at >= 600) return;
+            const validNew = brandNew.filter((p) => currentTime - p.created_at < 600);
 
-            setPosts((currentPosts) => {
-              if (currentPosts.some((p) => p.id === event.id)) return currentPosts;
-
+            if (validNew.length > 0) {
               setPendingPosts((prev) => {
-                if (prev.some((p) => p.id === event.id) || currentPosts.some((p) => p.id === event.id)) return prev;
-                return [{ ...event, reactions: [] }, ...prev].sort((a, b) => b.created_at - a.created_at) as TimelinePost[];
+                const prevIds = new Set(prev.map((p) => p.id));
+                const uniqueNew = validNew.filter((p) => !prevIds.has(p.id));
+                if (uniqueNew.length === 0) return prev;
+                
+                const formatted = uniqueNew.map((p) => ({ ...p, reactions: [] })) as TimelinePost[];
+                return [...formatted, ...prev].sort((a, b) => b.created_at - a.created_at);
               });
+            }
 
-              return currentPosts;
-            });
-          }
-        },
-      });
+            return currentPosts;
+          });
+        } catch (err) {
+          console.error('バックグラウンド更新エラー:', err);
+        }
+      }, 10000); // 10秒ごとに自動チェック
 
       return () => {
         isMounted = false;
-        sub.close();
+        clearInterval(intervalId);
       };
     }
   }, [follows, mode, pubkey, relays]);
@@ -229,7 +242,7 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     setPendingPosts([]);
   };
 
-  // PHANTOMのタイマー
+  // PHANTOMのタイマー（古い投稿を消す）
   useEffect(() => {
     if (mode !== 'PHANTOM') return;
 
