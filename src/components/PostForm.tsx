@@ -57,7 +57,7 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
 
         if (followPubkeys.length === 0) return;
 
-        // プロフィール（Kind 0）を一括取得（最大50件程度に絞るか、または取得できる範囲で）
+        // プロフィール（Kind 0）を一括取得（最大50件程度に絞る）
         const profileEvents = await pool.querySync(DEFAULT_RELAYS, {
           kinds: [0],
           authors: followPubkeys.slice(0, 50),
@@ -107,16 +107,13 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     const cursorPosition = e.target.selectionStart;
     setContent(val);
 
-    // カーソル位置より前にあるテキストから最後の "@" を探す
     const textBeforeCursor = val.slice(0, cursorPosition);
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
     if (lastAtIndex !== -1) {
-      // "@" の直前の文字がスペースや改行、あるいは文頭であるかチェック（メールアドレス等の誤爆を防ぐ）
       const charBeforeAt = lastAtIndex > 0 ? textBeforeCursor[lastAtIndex - 1] : ' ';
       if (/\s/.test(charBeforeAt)) {
         const query = textBeforeCursor.slice(lastAtIndex + 1);
-        // スペースや改行が入っていたらメンションモード終了
         if (!/\s/.test(query)) {
           setMentionQuery(query);
           setMentionStartIndex(lastAtIndex);
@@ -135,7 +132,7 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     ? follows.filter((user) => 
         user.name.toLowerCase().includes(mentionQuery.toLowerCase()) ||
         user.npub.toLowerCase().includes(mentionQuery.toLowerCase())
-      ).slice(0, 5) // 最大5件表示
+      ).slice(0, 5)
     : [];
 
   // メンション候補の選択確定
@@ -146,12 +143,9 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     if (!textarea) return;
 
     const cursorPosition = textarea.selectionStart;
-    // @ から現在のカーソル位置までの文字列を置き換える
     const before = content.slice(0, mentionStartIndex);
     const after = content.slice(cursorPosition);
     
-    // NIP-27 形式（nostr:npub...）または名前表記にする
-    // ここではわかりやすく `@表示名` (内部でnpubに置換される形) にします
     const mentionText = `@${user.name} `;
     const newContent = before + mentionText + after;
 
@@ -159,7 +153,6 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     setMentionQuery(null);
     setMentionStartIndex(-1);
 
-    // カーソルを挿入したテキストの末尾に移動
     const newCursorPos = mentionStartIndex + mentionText.length;
     setTimeout(() => {
       textarea.focus();
@@ -167,7 +160,7 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
     }, 0);
   };
 
-  // キーボード操作（上下矢印で候補選択、Enterで決定）
+  // キーボード操作
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (mentionQuery !== null && filteredFollows.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -211,13 +204,10 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
 
     setIsSubmitting(true);
     try {
-      // 本文中の "@表示名" から紐づくpubkeyを探し、NIP-27 / pタグを自動構築する高度な処理も可能ですが、
-      // まずはタグ（pタグ）やcontentの紐付けを行います。
       const tags: string[][] = [
         ['client', 'hinotr'],
       ];
 
-      // 本文に含まれるユーザーを検知してpタグを追加する簡易処理
       follows.forEach((user) => {
         if (content.includes(`@${user.name}`)) {
           tags.push(['p', user.pubkey]);
@@ -243,6 +233,9 @@ export function PostForm({ isOpen, onClose, pubkey }: PostFormProps) {
       setIsSubmitting(false);
     }
   };
+
+  // ★ isOpen が false のときは何も描画しない（これで常に前面に出る不具合が直ります）
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
