@@ -37,7 +37,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
 
   // 現在のモードに応じたpostsを返す
   const posts = mode === 'PHANTOM' ? phantomPosts : hinotoriPosts;
-  const setPosts = mode === 'PHANTOM' ? setPhantomPosts : setHinotoriPosts;
 
   const [pendingPosts, setPendingPosts] = useState<TimelinePost[]>([]);
   const [follows, setFollows] = useState<string[]>([]);
@@ -155,7 +154,6 @@ export function useNostrTimeline(pubkey: string | null, mode: AppMode) {
     }
 
     const fetchPosts = async () => {
-      // すでにキャッシュや描画データがあり、このセッションで一度取得していれば再フェッチをスキップしてサクサク動かす
       if (fetchedModes.current[mode]) return;
 
       setLoading(true);
