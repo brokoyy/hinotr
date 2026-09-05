@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import { PostCard } from './PostCard';
 import type { AppMode, TimelinePost } from '../types/nostr';
 
@@ -12,7 +12,6 @@ interface TimelineProps {
 export function Timeline({ posts, pendingPosts, onLoadNew, mode }: TimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // スクロール位置が一番上のときに自動で新着を取り込む場合などの処理
   const handleScroll = () => {
     if (!containerRef.current) return;
     const { scrollTop } = containerRef.current;
@@ -27,7 +26,6 @@ export function Timeline({ posts, pendingPosts, onLoadNew, mode }: TimelineProps
       onScroll={handleScroll}
       className="flex-1 overflow-y-auto relative"
     >
-      {/* 新着通知バッジ */}
       {pendingPosts.length > 0 && (
         <div className="sticky top-3 z-30 flex justify-center pointer-events-none px-4">
           <button
@@ -42,7 +40,6 @@ export function Timeline({ posts, pendingPosts, onLoadNew, mode }: TimelineProps
         </div>
       )}
 
-      {/* 投稿一覧 */}
       <div>
         {posts.map((post) => (
           <PostCard key={post.id} post={post} mode={mode} />
