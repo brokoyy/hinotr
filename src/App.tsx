@@ -4,7 +4,7 @@ import { loginWithNip07 } from './lib/nostr';
 import { useNostrTimeline } from './hooks/useNostrTimeline';
 import { useNostrNotifications } from './hooks/useNostrNotifications';
 import { Header } from './components/Header';
-import { PostCard } from './components/PostCard';
+import { Timeline } from './components/Timeline';
 import { PostForm } from './components/PostForm';
 import { SettingsModal } from './components/SettingsModal';
 import { NotificationsModal } from './components/NotificationsModal';
@@ -54,7 +54,7 @@ export default function App() {
     } catch (e) {}
   }, [theme]);
 
-  const { posts, loading, relays, userProfile } = useNostrTimeline(pubkey, mode);
+  const { posts, relays, userProfile } = useNostrTimeline(pubkey, mode);
   const { notifications, loading: notificationsLoading } = useNostrNotifications(pubkey);
 
   // 未読判定：最新の通知の created_at が lastReadTime よりも大きければ未読あり
@@ -98,7 +98,7 @@ export default function App() {
 
   return (
     <div className={`min-h-screen transition-colors duration-500 ${themeClasses}`}>
-      <div className="max-w-xl mx-auto min-h-screen border-x border-white/10 flex flex-col relative">
+      <div className="max-w-xl mx-auto h-screen border-x border-white/10 flex flex-col relative overflow-hidden">
         <Header
           mode={mode}
           setMode={setMode}
@@ -109,31 +109,25 @@ export default function App() {
           onLogin={handleLogin}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenNotifications={handleOpenNotifications}
-          hasUnread={hasUnread} // 未読フラグをヘッダーに渡す準備
+          hasUnread={hasUnread}
         />
 
-        <main className="flex-1">
-          {loading && (
-            <div className="p-8 text-center text-xs opacity-60">
-              タイムラインを読み込み中...
-            </div>
-          )}
-
-          {!loading && !pubkey && (
+        <main className="flex-1 flex flex-col overflow-hidden min-h-0">
+          {!pubkey && (
             <div className="p-12 text-center text-sm opacity-80 flex flex-col items-center gap-4">
               <p>NIP-07 拡張機能でログインするとタイムラインが表示されます。</p>
             </div>
           )}
 
-          {!loading && pubkey && posts.length === 0 && (
+          {pubkey && posts.length === 0 && (
             <div className="p-8 text-center text-xs opacity-60">
-              表示できる投稿がありません。
+              タイムラインを読み込み中...
             </div>
           )}
 
-          {pubkey && posts.map((post) => (
-            <PostCard key={post.id} post={post} mode={mode} />
-          ))}
+          {pubkey && posts.length > 0 && (
+            <Timeline posts={posts} mode={mode} />
+          )}
         </main>
 
         {/* 投稿ボタン：羽ペンアイコン */}
