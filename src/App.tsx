@@ -94,23 +94,23 @@ export default function App() {
     setPubkey(null);
   };
 
-  // 「最新側は完全な黒（または白）、スクロールするにつれて青（またはオレンジ）に染まる」グラデーション遷移
+  // 「最新側は完全な黒、スクロールして過去へ向かうにつれて深海のような深い青へ沈み込む」グラデーション遷移
   const getDynamicBackground = () => {
     const offset = Math.min(scrollTop, 1200);
 
     if (mode === 'PHANTOM') {
       if (theme === 'light') {
-        // Light: 上部は白、下に向かって青へ
+        // Light: 上部は白、下に向かって上品な淡いブルーへ
         const alpha = Math.min(0.95, (offset / 1000) * 0.9);
         return {
           background: `linear-gradient(to bottom, #ffffff 0%, #ffffff ${Math.max(50, 200 - offset * 0.15)}px, rgba(37, 99, 235, ${alpha}) 100%)`,
           color: '#0f172a',
         };
       } else {
-        // Dark: 最新側（上）は完全な黒、下にスクロール（10分前）するにつれて鮮やかな「青」に染まる
-        const alpha = Math.min(0.98, 0.05 + (offset / 900) * 0.93);
+        // Dark: 最新側（上）は完全な黒、下へスクロールするにつれて「深海のような深い青（#0f172a / rgb(15, 23, 42) や濃いネイビー）」へと深く染まる
+        const alpha = Math.min(0.99, 0.1 + (offset / 850) * 0.9);
         return {
-          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(37, 99, 235, ${alpha}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(15, 23, 42, ${alpha}) 100%)`,
           color: '#ffffff',
         };
       }
@@ -124,10 +124,10 @@ export default function App() {
           color: '#0f172a',
         };
       } else {
-        // Dark: 最新側（上）は完全な黒、下にスクロールするにつれて「オレンジ」に染まる
-        const alpha = Math.min(0.98, 0.05 + (offset / 900) * 0.93);
+        // Dark: 最新側（上）は完全な黒、下へスクロールするにつれて深みのあるオレンジ・赤褐色へ
+        const alpha = Math.min(0.99, 0.1 + (offset / 850) * 0.9);
         return {
-          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(234, 88, 12, ${alpha}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(124, 45, 18, ${alpha}) 100%)`,
           color: '#ffffff',
         };
       }
