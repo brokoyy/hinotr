@@ -83,56 +83,26 @@ export default function App() {
     setPubkey(null);
   };
 
-  // タイムライン全体（長大な長方形）に適用するグラデーション設定
-  const getTimelineBackgroundStyle = () => {
-    if (mode === 'PHANTOM') {
-      if (theme === 'light') {
-        return {
-          background: 'linear-gradient(to bottom, #ffffff 0%, #f0f4f8 20%, #1d4ed8 100%)',
-          color: '#0f172a',
-        };
-      } else {
-        // Dark: 最上部（最新・0分）が黒、下へ行くほどコバルトブルーへ
-        return {
-          background: 'linear-gradient(to bottom, #000000 0%, #000000 15%, #050b14 40%, #1d4ed8 100%)',
-          color: '#ffffff',
-        };
-      }
-    } else {
-      // HINOTORI モード
-      if (theme === 'light') {
-        return {
-          background: 'linear-gradient(to bottom, #ffffff 0%, #fff7ed 20%, #f97316 100%)',
-          color: '#0f172a',
-        };
-      } else {
-        // Dark: 最上部（最新・0分）が黒、下へ行くほど鮮やかなオレンジへ
-        return {
-          background: 'linear-gradient(to bottom, #000000 0%, #000000 15%, #140702 40%, #f97316 100%)',
-          color: '#ffffff',
-        };
-      }
-    }
-  };
-
-  const currentStyle = getTimelineBackgroundStyle();
+  // ご提示いただいた元のグラデーションクラスのマッピング
+  const themeClasses = {
+    PHANTOM: {
+      light: 'bg-gradient-to-b from-white via-white/90 to-blue-400 text-slate-900',
+      dark: 'bg-gradient-to-b from-black via-slate-950 to-blue-950 text-white',
+    },
+    HINOTORI: {
+      light: 'bg-gradient-to-b from-white to-orange-300 text-slate-900',
+      dark: 'bg-gradient-to-b from-black via-orange-950 to-orange-900 text-white',
+    },
+  }[mode][theme];
 
   return (
     <div 
       className="min-h-screen transition-colors duration-75"
-      style={{ 
-        background: theme === 'dark' ? '#000000' : '#ffffff', 
-        color: currentStyle.color 
-      }}
+      style={{ background: theme === 'dark' ? '#000000' : '#ffffff' }}
     >
       <div 
         ref={scrollContainerRef}
-        // スクロールコンテナ自体に背景グラデーションを持たせ、min-heightで十分に縦方向に引き伸ばす
-        className="max-w-xl mx-auto h-screen border-x border-white/10 flex flex-col relative overflow-y-auto overflow-x-hidden"
-        style={{ 
-          background: currentStyle.background,
-          backgroundSize: '100% 300vh' // タイムラインの長さに合わせてグラデーションを引き伸ばす
-        }}
+        className={`max-w-xl mx-auto h-screen border-x border-white/10 flex flex-col relative overflow-y-auto overflow-x-hidden ${themeClasses}`}
       >
         <Header
           mode={mode}
