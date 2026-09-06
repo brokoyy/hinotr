@@ -31,8 +31,8 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-  // スクロールの進捗率（0.0 〜 1.0）を管理するステート
-  const [scrollProgress, setScrollProgress] = useState(0);
+  // 実際のスクロール位置（ピクセル）を管理
+  const [scrollTop, setScrollTop] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // 最後に通知を確認したタイムスタンプの管理
@@ -58,28 +58,18 @@ export default function App() {
     } catch (e) {}
   }, [theme]);
 
-  // フックから posts に加え、pendingPosts と loadNewPosts を受け取る
   const { posts, pendingPosts, loadNewPosts, relays, userProfile } = useNostrTimeline(pubkey, mode);
   const { notifications, loading: notificationsLoading } = useNostrNotifications(pubkey);
 
-  // 未読判定：最新の通知の created_at が lastReadTime よりも大きければ未読あり
   const hasUnread = notifications.length > 0 && notifications[0].created_at > lastReadTime;
 
-  // スクロール位置を監視してプロgressを計算
+  // スクロール位置（px）を直接取得
   const handleScroll = () => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    const scrollTop = el.scrollTop;
-    const scrollHeight = el.scrollHeight - el.clientHeight;
-    if (scrollHeight <= 0) {
-      setScrollProgress(0);
-      return;
-    }
-    const progress = Math.min(Math.max(scrollTop / scrollHeight, 0), 1);
-    setScrollProgress(progress);
+    setScrollTop(el.scrollTop);
   };
 
-  // 通知モーダルを開いたときの処理（既読にする）
   const handleOpenNotifications = () => {
     setIsNotificationsOpen(true);
     if (notifications.length > 0) {
@@ -104,20 +94,22 @@ export default function App() {
     setPubkey(null);
   };
 
-  // スクロール進捗（scrollProgress: 0.0 ~ 1.0）に応じて背景のグラデーションを動的に変化させるスタイル
-  // 下に行くほど（progressが1に近づくほど）青やオレンジの濃さが強くなります
+  // スクロール量（scrollTop px）に連動した背景グラデーション
+  // 下にスクロールするほど（scrollTopが大きくなるほど）、青やオレンジのグラデーション範囲が広がって濃くなります
   const getDynamicBackground = () => {
+    // スクロール量に応じて変化するオフセット値（ピクセル感度を調整可能）
+    const offset = Math.min(scrollTop, 800); // 最大800px分までグラデーションが展開
+
     if (mode === 'PHANTOM') {
       if (theme === 'light') {
-        // Light: 白から始まり、下に行くにつれて濃いブルー（blue-500/600）へ沈み込む
         return {
-          background: `linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, ${Math.max(0.7, 1 - scrollProgress * 0.5)}) ${30 + scrollProgress * 20}%, rgba(96, 165, 250, ${0.3 + scrollProgress * 0.5}) 100%)`,
+          background: `linear-gradient(to bottom, #ffffff 0%, rgba(255, 255, 255, 0.8) ${Math.max(50, 200 + offset)}px, rgba(96, 165, 250, ${Math.min(0.8, 0.2 + offset / 1000)}) 100%)`,
           color: '#0f172a',
         };
       } else {
-        // Dark: 黒から始まり、下に行くにつれてディープな青（blue-950/900）が濃厚になる
+        // ダークモード・PHANTOM：上部は完全に黒、下（スクロール）へ行くにつれて青が広がる・濃くなる
         return {
-          background: `linear-gradient(to bottom, #000000 0%, rgba(15, 23, 42, ${0.8 + scrollProgress * 0.2}) ${40 + scrollProgress * 20}%, rgba(30, 58, 138, ${0.4 + scrollProgress * 0.6}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(100, 300 + offset * 0.5)}px, rgba(15, 23, 42, ${Math.min(0.95, 0.4 + offset / 1000)}) ${Math.max(300, 600 + offset)}px, rgba(30, 58, 138, ${Math.min(0.9, 0.3 + offset / 800)}) 100%)`,
           color: '#ffffff',
         };
       }
@@ -125,12 +117,12 @@ export default function App() {
       // HINOTORI モード
       if (theme === 'light') {
         return {
-          background: `linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 237, 213, ${0.4 + scrollProgress * 0.5}) ${40 + scrollProgress * 20}%, rgba(249, 115, 22, ${0.3 + scrollProgress * 0.5}) 100%)`,
+          background: `linear-gradient(to bottom, #ffffff 0%, rgba(255, 237, 213, 0.5) ${Math.max(50, 200 + offset)}px, rgba(249, 115, 22, ${Math.min(0.8, 0.2 + offset / 1000)}) 100%)`,
           color: '#0f172a',
         };
       } else {
         return {
-          background: `linear-gradient(to bottom, #000000 0%, rgba(67, 20, 7, ${0.7 + scrollProgress * 0.3}) ${40 + scrollProgress * 20}%, rgba(154, 52, 18, ${0.4 + scrollProgress * 0.6}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(100, 300 + offset * 0.5)}px, rgba(67, 20, 7, ${Math.min(0.95, 0.4 + offset / 1000)}) ${Math.max(300, 600 + offset)}px, rgba(154, 52, 18, ${Math.min(0.9, 0.3 + offset / 800)}) 100%)`,
           color: '#ffffff',
         };
       }
@@ -141,7 +133,7 @@ export default function App() {
 
   return (
     <div 
-      className="min-h-screen transition-colors duration-200"
+      className="min-h-screen transition-colors duration-150"
       style={{ background: currentStyle.background, color: currentStyle.color }}
     >
       <div 
@@ -215,7 +207,7 @@ export default function App() {
         />
 
         <NotificationsModal
-          isOpen={isNotificationsOpen}
+          isOpen={isNotificationsModalOpen}
           onClose={() => setIsNotificationsOpen(false)}
           theme={theme}
           notifications={notifications}
