@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AppMode, Theme } from './types/nostr';
 import { loginWithNip07 } from './lib/nostr';
 import { useNostrTimeline } from './hooks/useNostrTimeline';
@@ -31,6 +31,10 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
+  // スクロールの進捗率（0.0 〜 1.0）を管理するステート
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   // 最後に通知を確認したタイムスタンプの管理
   const [lastReadTime, setLastReadTime] = useState<number>(() => {
     try {
@@ -61,6 +65,20 @@ export default function App() {
   // 未読判定：最新の通知の created_at が lastReadTime よりも大きければ未読あり
   const hasUnread = notifications.length > 0 && notifications[0].created_at > lastReadTime;
 
+  // スクロール位置を監視してプロgressを計算
+  const handleScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const scrollTop = el.scrollTop;
+    const scrollHeight = el.scrollHeight - el.clientHeight;
+    if (scrollHeight <= 0) {
+      setScrollProgress(0);
+      return;
+    }
+    const progress = Math.min(Math.max(scrollTop / scrollHeight, 0), 1);
+    setScrollProgress(progress);
+  };
+
   // 通知モーダルを開いたときの処理（既読にする）
   const handleOpenNotifications = () => {
     setIsNotificationsOpen(true);
@@ -86,20 +104,51 @@ export default function App() {
     setPubkey(null);
   };
 
-  const themeClasses = {
-    PHANTOM: {
-      light: 'bg-gradient-to-b from-white via-white/90 to-blue-400 text-slate-900',
-      dark: 'bg-gradient-to-b from-black via-slate-950 to-blue-950 text-white',
-    },
-    HINOTORI: {
-      light: 'bg-gradient-to-b from-white to-orange-300 text-slate-900',
-      dark: 'bg-gradient-to-b from-black via-orange-950 to-orange-900 text-white',
-    },
-  }[mode][theme];
+  // スクロール進捗（scrollProgress: 0.0 ~ 1.0）に応じて背景のグラデーションを動的に変化させるスタイル
+  // 下に行くほど（progressが1に近づくほど）青やオレンジの濃さが強くなります
+  const getDynamicBackground = () => {
+    if (mode === 'PHANTOM') {
+      if (theme === 'light') {
+        // Light: 白から始まり、下に行くにつれて濃いブルー（blue-500/600）へ沈み込む
+        return {
+          background: `linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, ${Math.max(0.7, 1 - scrollProgress * 0.5)}) ${30 + scrollProgress * 20}%, rgba(96, 165, 250, ${0.3 + scrollProgress * 0.5}) 100%)`,
+          color: '#0f172a',
+        };
+      } else {
+        // Dark: 黒から始まり、下に行くにつれてディープな青（blue-950/900）が濃厚になる
+        return {
+          background: `linear-gradient(to bottom, #000000 0%, rgba(15, 23, 42, ${0.8 + scrollProgress * 0.2}) ${40 + scrollProgress * 20}%, rgba(30, 58, 138, ${0.4 + scrollProgress * 0.6}) 100%)`,
+          color: '#ffffff',
+        };
+      }
+    } else {
+      // HINOTORI モード
+      if (theme === 'light') {
+        return {
+          background: `linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 237, 213, ${0.4 + scrollProgress * 0.5}) ${40 + scrollProgress * 20}%, rgba(249, 115, 22, ${0.3 + scrollProgress * 0.5}) 100%)`,
+          color: '#0f172a',
+        };
+      } else {
+        return {
+          background: `linear-gradient(to bottom, #000000 0%, rgba(67, 20, 7, ${0.7 + scrollProgress * 0.3}) ${40 + scrollProgress * 20}%, rgba(154, 52, 18, ${0.4 + scrollProgress * 0.6}) 100%)`,
+          color: '#ffffff',
+        };
+      }
+    }
+  };
+
+  const currentStyle = getDynamicBackground();
 
   return (
-    <div className={`min-h-screen transition-colors duration-500 ${themeClasses}`}>
-      <div className="max-w-xl mx-auto h-screen border-x border-white/10 flex flex-col relative overflow-hidden">
+    <div 
+      className="min-h-screen transition-colors duration-200"
+      style={{ background: currentStyle.background, color: currentStyle.color }}
+    >
+      <div 
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="max-w-xl mx-auto h-screen border-x border-white/10 flex flex-col relative overflow-y-auto overflow-x-hidden"
+      >
         <Header
           mode={mode}
           setMode={setMode}
@@ -113,7 +162,7 @@ export default function App() {
           hasUnread={hasUnread}
         />
 
-        <main className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <main className="flex-1 flex flex-col min-h-0">
           {!pubkey && (
             <div className="p-12 text-center text-sm opacity-80 flex flex-col items-center gap-4">
               <p>NIP-07 拡張機能でログインするとタイムラインが表示されます。</p>
