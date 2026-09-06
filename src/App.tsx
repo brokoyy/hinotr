@@ -92,9 +92,9 @@ export default function App() {
           color: '#0f172a',
         };
       } else {
-        // Dark: 最上部（最新・0分）が黒、中間でじわじわ変化し、下に行くほどコバルトブルーへ
+        // Dark: 最上部（最新・0分）が黒、下に行くほどコバルトブルーへ
         return {
-          background: 'linear-gradient(to bottom, #000000 0%, #000000 15%, #050b14 40%, #1d4ed8 100%)',
+          background: 'linear-gradient(to bottom, #000000 0%, #000000 10%, #050b14 35%, #1d4ed8 100%)',
           color: '#ffffff',
         };
       }
@@ -108,7 +108,7 @@ export default function App() {
       } else {
         // Dark: 最上部（最新・0分）が黒、下に行くほど鮮やかなオレンジへ
         return {
-          background: 'linear-gradient(to bottom, #000000 0%, #000000 15%, #140702 40%, #f97316 100%)',
+          background: 'linear-gradient(to bottom, #000000 0%, #000000 10%, #140702 35%, #f97316 100%)',
           color: '#ffffff',
         };
       }
@@ -129,12 +129,12 @@ export default function App() {
         ref={scrollContainerRef}
         className="max-w-xl mx-auto h-screen border-x border-white/10 flex flex-col relative overflow-y-auto overflow-x-hidden"
       >
-        {/* タイムラインのコンテンツ全体と同じ高さを持つ、スクロール連動の背景レイヤー */}
+        {/* スクロールコンテナの中身全体に背景グラデーションを確実に適用 */}
         <div 
           className="absolute inset-0 pointer-events-none -z-10"
           style={{ 
-            minHeight: '100%', 
-            height: 'max-content',
+            height: '100%',
+            minHeight: '250vh', // コンテンツ量に応じて背景グラデーションが縦長に引き伸ばされるように確保
             background: currentStyle.background 
           }}
         />
