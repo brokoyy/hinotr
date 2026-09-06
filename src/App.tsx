@@ -207,7 +207,7 @@ export default function App() {
         />
 
         <NotificationsModal
-          isOpen={isNotificationsOpen} // ← ここを修正
+          isOpen={isNotificationsOpen} 
           onClose={() => setIsNotificationsOpen(false)}
           theme={theme}
           notifications={notifications}
