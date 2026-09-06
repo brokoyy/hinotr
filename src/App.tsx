@@ -94,40 +94,34 @@ export default function App() {
     setPubkey(null);
   };
 
-  // 「最新側は完全な黒、スクロールして過去へ向かうにつれてコバルトブルー / オレンジに染まる」グラデーション
+  // グラデーション設定（Lightは上部白から各色へ、Darkは上部完全な黒から各色へダイナミックに変化）
   const getDynamicBackground = () => {
-    const offset = Math.min(scrollTop, 1200);
-
     if (mode === 'PHANTOM') {
       if (theme === 'light') {
-        // Light: 上部は白、下に向かってブルーへ
-        const alpha = Math.min(0.95, (offset / 1000) * 0.9);
+        // Lightモード: PHANTOM (白 → コバルトブルー系)
         return {
-          background: `linear-gradient(to bottom, #ffffff 0%, #ffffff ${Math.max(50, 200 - offset * 0.15)}px, rgba(37, 99, 235, ${alpha}) 100%)`,
+          background: `linear-gradient(to bottom, #ffffff 0%, #f0f4f8 ${Math.max(50, 400 - scrollTop * 0.3)}px, #1d4ed8 100%)`,
           color: '#0f172a',
         };
       } else {
-        // Dark: 上部は完全な黒、下へスクロールするにつれて「コバルトブルー」へ鮮やかに変化
-        const alpha = Math.min(0.98, 0.05 + (offset / 900) * 0.93);
+        // Darkモード: PHANTOM (完全な黒 → コバルトブルー)
         return {
-          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(29, 78, 216, ${alpha}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #050b14 ${Math.max(80, 350 - scrollTop * 0.3)}px, #1d4ed8 100%)`,
           color: '#ffffff',
         };
       }
     } else {
       // HINOTORI モード
       if (theme === 'light') {
-        // Light: 上部は白、下に向かってオレンジへ
-        const alpha = Math.min(0.95, (offset / 1000) * 0.9);
+        // Lightモード: HINOTORI (白 → 鮮やかなオレンジ)
         return {
-          background: `linear-gradient(to bottom, #ffffff 0%, #ffffff ${Math.max(50, 200 - offset * 0.15)}px, rgba(249, 115, 22, ${alpha}) 100%)`,
+          background: `linear-gradient(to bottom, #ffffff 0%, #fff7ed ${Math.max(50, 400 - scrollTop * 0.3)}px, #f97316 100%)`,
           color: '#0f172a',
         };
       } else {
-        // Dark: 上部は完全な黒、下へスクロールするにつれてご提示いただいた「鮮やかなオレンジ」へ変化
-        const alpha = Math.min(0.98, 0.05 + (offset / 900) * 0.93);
+        // Darkモード: HINOTORI (完全な黒 → 鮮やかなオレンジ)
         return {
-          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(249, 115, 22, ${alpha}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #140702 ${Math.max(80, 350 - scrollTop * 0.3)}px, #f97316 100%)`,
           color: '#ffffff',
         };
       }
