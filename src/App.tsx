@@ -94,42 +94,40 @@ export default function App() {
     setPubkey(null);
   };
 
-  // ブログの仕様に合わせたグラデーション遷移：
-  // トップ付近は完全に単色の白（Light）または黒（Dark）を維持し、
-  // スクロール（過去への遡り）に伴ってカラー領域（青/オレンジ）が下からダイナミックに広がって濃くなる
+  // 「最新側は完全な黒（または白）、スクロールするにつれて青（またはオレンジ）に染まる」グラデーション遷移
   const getDynamicBackground = () => {
     const offset = Math.min(scrollTop, 1200);
 
     if (mode === 'PHANTOM') {
       if (theme === 'light') {
-        // Light: 上部は完全な白(#ffffff)、スクロールすると下から爽やかなブルーが濃く広がる
-        const blueAlpha = Math.min(0.95, 0.2 + (offset / 900) * 0.75);
+        // Light: 上部は白、下に向かって青へ
+        const alpha = Math.min(0.95, (offset / 1000) * 0.9);
         return {
-          background: `linear-gradient(to bottom, #ffffff 0%, #ffffff ${Math.max(120, 350 - offset * 0.25)}px, rgba(96, 165, 250, ${blueAlpha}) 100%)`,
+          background: `linear-gradient(to bottom, #ffffff 0%, #ffffff ${Math.max(50, 200 - offset * 0.15)}px, rgba(37, 99, 235, ${alpha}) 100%)`,
           color: '#0f172a',
         };
       } else {
-        // Dark: 上部は完全な黒(#000000)、スクロールすると下からリッチな青が深く濃く広がる
-        const darkBlueAlpha = Math.min(0.98, 0.25 + (offset / 900) * 0.73);
+        // Dark: 最新側（上）は完全な黒、下にスクロール（10分前）するにつれて鮮やかな「青」に染まる
+        const alpha = Math.min(0.98, 0.05 + (offset / 900) * 0.93);
         return {
-          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(120, 350 - offset * 0.25)}px, rgba(30, 58, 138, ${darkBlueAlpha}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(37, 99, 235, ${alpha}) 100%)`,
           color: '#ffffff',
         };
       }
     } else {
       // HINOTORI モード
       if (theme === 'light') {
-        // Light: 上部は完全な白(#ffffff)、スクロールすると下から温かなオレンジが広がる
-        const orangeAlpha = Math.min(0.95, 0.2 + (offset / 900) * 0.75);
+        // Light: 上部は白、下に向かってオレンジへ
+        const alpha = Math.min(0.95, (offset / 1000) * 0.9);
         return {
-          background: `linear-gradient(to bottom, #ffffff 0%, #ffffff ${Math.max(120, 350 - offset * 0.25)}px, rgba(251, 146, 60, ${orangeAlpha}) 100%)`,
+          background: `linear-gradient(to bottom, #ffffff 0%, #ffffff ${Math.max(50, 200 - offset * 0.15)}px, rgba(234, 88, 12, ${alpha}) 100%)`,
           color: '#0f172a',
         };
       } else {
-        // Dark: 上部は完全な黒(#000000)、スクロールすると下から重厚なオレンジが広がる
-        const darkOrangeAlpha = Math.min(0.98, 0.25 + (offset / 900) * 0.73);
+        // Dark: 最新側（上）は完全な黒、下にスクロールするにつれて「オレンジ」に染まる
+        const alpha = Math.min(0.98, 0.05 + (offset / 900) * 0.93);
         return {
-          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(120, 350 - offset * 0.25)}px, rgba(124, 45, 18, ${darkOrangeAlpha}) 100%)`,
+          background: `linear-gradient(to bottom, #000000 0%, #000000 ${Math.max(40, 180 - offset * 0.15)}px, rgba(234, 88, 12, ${alpha}) 100%)`,
           color: '#ffffff',
         };
       }
