@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { nip19 } from 'nostr-tools';
+import { AlertTriangle } from 'lucide-react'; // ← ここに必ず記述してください
 import type { AppMode, TimelinePost } from '../types/nostr';
 import { pool, DEFAULT_RELAYS } from '../lib/nostr';
 import type { Event as NostrEvent } from 'nostr-tools';
-import { ParsedContent } from './EmojiParser'; // ← EmojiParserをインポート
+import { ParsedContent } from './EmojiParser';
 
 interface PostCardProps {
   post: TimelinePost;
@@ -624,13 +625,13 @@ export function PostCard({ post, mode }: PostCardProps) {
             </span>
           </div>
 
-         {/* NSFW / Content Warning の目隠し処理 */}
+          {/* NSFW / Content Warning の目隠し処理 */}
           {hasContentWarning && !isRevealed ? (
             <div
               onClick={() => setIsRevealed(true)}
               className="cursor-pointer my-2 p-6 rounded-2xl flex flex-col items-center justify-center gap-2 bg-white text-slate-900 border border-slate-200 dark:bg-black dark:text-slate-100 dark:border-slate-800 shadow-md transition hover:opacity-90"
             >
-              <AlertTriangle className="w-10 h-10 text-amber-500" /> 
+              <AlertTriangle className="w-10 h-10 text-amber-500" />
               <span className="text-sm font-bold tracking-wide">{warningReason}</span>
               <span className="text-xs text-blue-500 dark:text-blue-400 underline mt-1">
                 タップして表示
