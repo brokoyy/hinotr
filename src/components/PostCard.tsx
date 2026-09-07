@@ -256,7 +256,6 @@ function EmbeddedNoteCard({ beacon }: { beacon: string }) {
   );
 }
 
-// ユーザー名解決用の小さなコンポーネント（本文中の npub を `@表示名` に変換しつつ、カスタム絵文字もパースする）
 function MentionTextRenderer({ text, tags }: { text: string; tags: string[][] }) {
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({});
 
@@ -324,7 +323,6 @@ function MentionTextRenderer({ text, tags }: { text: string; tags: string[][] })
     };
   }, [text]);
 
-  // npub部分をパースして綺麗に置換
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   const regex = new RegExp(NPUB_REGEX);
@@ -336,7 +334,6 @@ function MentionTextRenderer({ text, tags }: { text: string; tags: string[][] })
     const startIndex = match.index;
 
     if (startIndex > lastIndex) {
-      // npubより手前のテキスト部分はカスタム絵文字（ParsedContent）を通す
       parts.push(
         <ParsedContent 
           key={`text-${lastIndex}`} 
@@ -377,6 +374,12 @@ export function PostCard({ post, mode }: PostCardProps) {
   const [replyText, setReplyText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReacting, setIsReacting] = useState(false);
+
+  // NIP-36 Content Warning の判定
+  const contentWarningTag = post.tags?.find((tag) => tag[0] === 'content-warning');
+  const hasContentWarning = !!contentWarningTag;
+  const warningReason = contentWarningTag?.[1] || '閲覧注意 (NSFW)';
+  const [isRevealed, setIsRevealed] = useState(false);
 
   const fetchedReactions: NostrEvent[] = (post as any).reactions || [];
 
@@ -552,7 +555,6 @@ export function PostCard({ post, mode }: PostCardProps) {
     return (
       <div>
         <p className="whitespace-pre-wrap break-words">
-          {/* メンション解決とカスタム絵文字パースの両方に対応 */}
           <MentionTextRenderer text={textOnly} tags={tags} />
         </p>
         
@@ -622,8 +624,21 @@ export function PostCard({ post, mode }: PostCardProps) {
             </span>
           </div>
 
-          {/* tags を渡してあげる */}
-          {renderContent(post.content, post.tags)}
+         {/* NSFW / Content Warning の目隠し処理 */}
+          {hasContentWarning && !isRevealed ? (
+            <div
+              onClick={() => setIsRevealed(true)}
+              className="cursor-pointer my-2 p-6 rounded-2xl flex flex-col items-center justify-center gap-2 bg-white text-slate-900 border border-slate-200 dark:bg-black dark:text-slate-100 dark:border-slate-800 shadow-md transition hover:opacity-90"
+            >
+              <AlertTriangle className="w-10 h-10 text-amber-500" /> 
+              <span className="text-sm font-bold tracking-wide">{warningReason}</span>
+              <span className="text-xs text-blue-500 dark:text-blue-400 underline mt-1">
+                タップして表示
+              </span>
+            </div>
+          ) : (
+            renderContent(post.content, post.tags)
+          )}
 
           {mode === 'PHANTOM' && (
             <div className="flex items-center justify-between mt-3 text-xs opacity-70">
